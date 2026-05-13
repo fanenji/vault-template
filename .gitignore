@@ -15,6 +15,9 @@ Thumbs.db
 # Internal tooling state
 .llm-wiki/
 
+# OpenCode
+.opencode/node_modules/
+
 # Inbox (staging files, ephemeral)
 _inbox/
 

@@ -24,20 +24,24 @@
   "unresolvedLinks": false,
   "recentFilesStore": [
     {
+      "filepath": "schema.md",
+      "timestamp": 1778699208394
+    },
+    {
+      "filepath": "purpose.md",
+      "timestamp": 1778699206829
+    },
+    {
+      "filepath": "CLAUDE.md",
+      "timestamp": 1778699205323
+    },
+    {
+      "filepath": "AGENTS.md",
+      "timestamp": 1778699203830
+    },
+    {
       "filepath": "README.md",
       "timestamp": 1778687378756
-    },
-    {
-      "filepath": "_notes/01.todo/_todo.md",
-      "timestamp": 1778679531140
-    },
-    {
-      "filepath": "_notes/03.meetings/2026-05-12 Riunione SEACOM - GitFlow.md",
-      "timestamp": 1778678804561
-    },
-    {
-      "filepath": "schema.md",
-      "timestamp": 1778678550670
     }
   ],
   "bookmarkedFileStore": [],

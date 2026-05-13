@@ -1,6 +1,22 @@
 {
   "recentFiles": [
     {
+      "basename": "schema",
+      "path": "schema.md"
+    },
+    {
+      "basename": "purpose",
+      "path": "purpose.md"
+    },
+    {
+      "basename": "CLAUDE",
+      "path": "CLAUDE.md"
+    },
+    {
+      "basename": "AGENTS",
+      "path": "AGENTS.md"
+    },
+    {
       "basename": "README",
       "path": "README.md"
     },
@@ -11,22 +27,6 @@
     {
       "basename": "2026-05-12 Riunione SEACOM - GitFlow",
       "path": "_notes/03.meetings/2026-05-12 Riunione SEACOM - GitFlow.md"
-    },
-    {
-      "basename": "schema",
-      "path": "schema.md"
-    },
-    {
-      "basename": "purpose",
-      "path": "purpose.md"
-    },
-    {
-      "basename": "AGENTS",
-      "path": "AGENTS.md"
-    },
-    {
-      "basename": "CLAUDE",
-      "path": "CLAUDE.md"
     },
     {
       "basename": "2026-02-06 Meeting SEACOM",

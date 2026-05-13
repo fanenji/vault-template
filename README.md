@@ -1,6 +1,6 @@
 # Data Platform LLM Wiki
 
-Obsidian vault documenting the Data Platform architecture, technologies, decisions, and research. Managed via LLM-based tooling.
+Obsidian vault `<VAULT_DESCRIPTION>`. Managed via LLM-based tooling.
 
 The vault is divided in 2 parts:
 - The LLM Wiki part
