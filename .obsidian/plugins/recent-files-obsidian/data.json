@@ -1,6 +1,30 @@
 {
   "recentFiles": [
     {
+      "basename": "CLAUDE",
+      "path": "CLAUDE.md"
+    },
+    {
+      "basename": "AGENTS",
+      "path": "AGENTS.md"
+    },
+    {
+      "basename": "README",
+      "path": "README.md"
+    },
+    {
+      "basename": "purpose",
+      "path": "purpose.md"
+    },
+    {
+      "basename": "schema",
+      "path": "schema.md"
+    },
+    {
+      "basename": "_todo",
+      "path": "_notes/01.todo/_todo.md"
+    },
+    {
       "basename": "3 Reasons Data Engineers Are the Unsung Heroes of GenAI",
       "path": "raw/sources/3 Reasons Data Engineers Are the Unsung Heroes of GenAI.md"
     },
@@ -13,28 +37,12 @@
       "path": "raw/sources/AI-Ready Data vs. Analytics-Ready Data.md"
     },
     {
-      "basename": "purpose",
-      "path": "purpose.md"
-    },
-    {
       "basename": "geospatial-api-server-comparison",
       "path": "wiki/comparisons/geospatial-api-server-comparison.md"
     },
     {
-      "basename": "schema",
-      "path": "schema.md"
-    },
-    {
-      "basename": "README",
-      "path": "README.md"
-    },
-    {
       "basename": "PROCESS",
       "path": "wiki/sources/PROCESS.md"
-    },
-    {
-      "basename": "_todo",
-      "path": "_notes/01.todo/_todo.md"
     },
     {
       "basename": "LLM-WIKI",
@@ -51,14 +59,6 @@
     {
       "basename": "llm_wiki_arch",
       "path": "_notes/02.notes/llm-wiki/llm_wiki_arch.canvas"
-    },
-    {
-      "basename": "AGENTS",
-      "path": "AGENTS.md"
-    },
-    {
-      "basename": "CLAUDE",
-      "path": "CLAUDE.md"
     },
     {
       "basename": "dbt-unit-testing",

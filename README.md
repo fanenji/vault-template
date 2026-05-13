@@ -11,12 +11,7 @@ The /raw/ and /wiki/ folders and purpose.md and schema.md files pertain to the l
 The \_inbox,\_notes and \_system older are personal folders managed with Obsidian and Claude/OpenCode agents.
 
 
-
-
-
-
 ---
-
 ## Commands
 
 These slash commands are available in both `.claude/commands/` and `.opencode/commands/`.

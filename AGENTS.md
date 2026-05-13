@@ -1,8 +1,7 @@
-# AGENTS.md — dp-llm-wiki
 
-Data Platform architecture wiki (Obsidian vault) maintained via LLM. Not a code project — no build, test, lint, or typecheck steps.
+## What this repo is
 
-The wiki is based on this OpenSource project: https://github.com/nashsu/llm_wiki and extends it with custom dirs and commands.
+An **Obsidian vault**, not a software project — there is no build, test, lint, or typecheck step. The vault documents the Data Platform's architecture, technologies, decisions, and research, and is maintained collaboratively by a human curator and an LLM. It extends the open-source pattern at https://github.com/nashsu/llm_wiki.
 
 
 ## Before any wiki operation

@@ -6,6 +6,7 @@
 2. Define the process (ingestion and analisys of dataset)
 3. Define the Data Governance system and related rules
 4. Track the main decisions
+5. Mantain a Knowledge Base about Data Engineering, Modern Data Stack and Data Platforms.
 
 ## Key Questions
 
@@ -17,6 +18,7 @@
 ## Scope
 
 ## **In scope:**
+
 
 ## **Out of scope:**
 

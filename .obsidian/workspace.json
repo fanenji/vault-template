@@ -40,6 +40,22 @@
             }
           },
           {
+            "id": "efaecdc4b836fa2f",
+            "type": "leaf",
+            "pinned": true,
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "CLAUDE.md",
+                "mode": "source",
+                "source": false
+              },
+              "pinned": true,
+              "icon": "lucide-file",
+              "title": "CLAUDE"
+            }
+          },
+          {
             "id": "edcb9c15955aa93f",
             "type": "leaf",
             "pinned": true,
@@ -56,21 +72,23 @@
             }
           },
           {
-            "id": "d7db9eacdcffd00d",
+            "id": "9d8868bb734fcbc1",
             "type": "leaf",
+            "pinned": true,
             "state": {
               "type": "markdown",
               "state": {
-                "file": "raw/sources/3 Reasons Data Engineers Are the Unsung Heroes of GenAI.md",
+                "file": "purpose.md",
                 "mode": "source",
                 "source": false
               },
+              "pinned": true,
               "icon": "lucide-file",
-              "title": "3 Reasons Data Engineers Are the Unsung Heroes of GenAI"
+              "title": "purpose"
             }
           }
         ],
-        "currentTab": 3
+        "currentTab": 2
       }
     ],
     "direction": "vertical"
@@ -147,7 +165,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 249.5
+    "width": 200
   },
   "right": {
     "id": "45ad9902070877bf",
@@ -225,13 +243,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "raw/sources/3 Reasons Data Engineers Are the Unsung Heroes of GenAI.md",
+                "file": "CLAUDE.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of 3 Reasons Data Engineers Are the Unsung Heroes of GenAI"
+              "title": "Outline of CLAUDE"
             }
           },
           {
@@ -250,16 +268,16 @@
             "state": {
               "type": "git-history-view",
               "state": {},
-              "icon": "lucide-ghost",
-              "title": "git-history-view"
+              "icon": "history",
+              "title": "History"
             }
           }
         ],
-        "currentTab": 5
+        "currentTab": 4
       }
     ],
     "direction": "horizontal",
-    "width": 620.5
+    "width": 219.5
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -274,22 +292,25 @@
       "omnisearch:Omnisearch": false
     }
   },
-  "active": "d7db9eacdcffd00d",
+  "active": "efaecdc4b836fa2f",
   "lastOpenFiles": [
+    "AGENTS.md",
+    "README.md",
+    "purpose.md",
+    "schema.md",
+    "CLAUDE.md",
+    "_notes/01.todo/_todo.md",
+    "raw/sources/3 Reasons Data Engineers Are the Unsung Heroes of GenAI.md",
     "_notes/03.meetings/2026-05-12 Riunione SEACOM - GitFlow.md",
     "_notes/03.meetings",
     "raw/sources/AI-Ready Data vs. Analytics-Ready Data.md",
     "_inbox/clippings/AI-Ready Data vs. Analytics-Ready Data.md",
-    "purpose.md",
     "wiki/comparisons/geospatial-api-server-comparison.md",
     "wiki/overview.md",
-    "schema.md",
-    "README.md",
     "wiki/sources/PROCESS.md",
     "_notes/04.projects",
     "_notes/90.archive",
     "_notes",
-    "_notes/01.todo/_todo.md",
     "_notes/02.notes/CI-CD GIT FLOW v2.0.md",
     "_notes/02.notes/llm-wiki/LLM-WIKI.md",
     "_notes/02.notes/llm-wiki",
@@ -300,8 +321,6 @@
     "wiki/entities/openmetadata-permission-limitations.md",
     "wiki/sources/permission-control-open-metadata-openmetadata-disc-20260510.md",
     "raw/sources/permission-control-open-metadata-openmetadata-disc-20260510.md",
-    "AGENTS.md",
-    "CLAUDE.md",
     "_notes/llm_wiki_arch.md",
     "_notes/llm_wiki_arch.jpg",
     "wiki/concepts/dbt-unit-testing.md",
