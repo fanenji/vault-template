@@ -33,3 +33,13 @@ venv/
 *.log
 .DS_Store
 
+# SSH keys and certificates
+*.ppk
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+id_ecdsa
+
