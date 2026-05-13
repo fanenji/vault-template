@@ -1,4 +1,5 @@
 
+- [ ] #docs OpenMetadata
 - [ ] #dev Test e2e dbt-workflow
 - [ ] #dev Sviluppo pipeline Kestra - test e documentazione
 - [ ] #processo Analisi approfondita GitFlow
@@ -23,6 +24,5 @@
 	- [Dremio MCP](https://docs.dremio.com/current/developer/mcp-server/)
 	- [dbt MCP](https://github.com/dbt-labs/dbt-mcp)
 	
-
 
 

@@ -1,36 +1,40 @@
 {
   "recentFiles": [
     {
-      "basename": "CLAUDE",
-      "path": "CLAUDE.md"
-    },
-    {
-      "basename": "AGENTS",
-      "path": "AGENTS.md"
-    },
-    {
       "basename": "README",
       "path": "README.md"
-    },
-    {
-      "basename": "purpose",
-      "path": "purpose.md"
-    },
-    {
-      "basename": "schema",
-      "path": "schema.md"
     },
     {
       "basename": "_todo",
       "path": "_notes/01.todo/_todo.md"
     },
     {
-      "basename": "3 Reasons Data Engineers Are the Unsung Heroes of GenAI",
-      "path": "raw/sources/3 Reasons Data Engineers Are the Unsung Heroes of GenAI.md"
-    },
-    {
       "basename": "2026-05-12 Riunione SEACOM - GitFlow",
       "path": "_notes/03.meetings/2026-05-12 Riunione SEACOM - GitFlow.md"
+    },
+    {
+      "basename": "schema",
+      "path": "schema.md"
+    },
+    {
+      "basename": "purpose",
+      "path": "purpose.md"
+    },
+    {
+      "basename": "AGENTS",
+      "path": "AGENTS.md"
+    },
+    {
+      "basename": "CLAUDE",
+      "path": "CLAUDE.md"
+    },
+    {
+      "basename": "2026-02-06 Meeting SEACOM",
+      "path": "_notes/03.meetings/2026-02-06 Meeting SEACOM.md"
+    },
+    {
+      "basename": "3 Reasons Data Engineers Are the Unsung Heroes of GenAI",
+      "path": "raw/sources/3 Reasons Data Engineers Are the Unsung Heroes of GenAI.md"
     },
     {
       "basename": "AI-Ready Data vs. Analytics-Ready Data",
@@ -45,20 +49,12 @@
       "path": "wiki/sources/PROCESS.md"
     },
     {
-      "basename": "LLM-WIKI",
-      "path": "_notes/02.notes/llm-wiki/LLM-WIKI.md"
-    },
-    {
       "basename": "SCHEMA Management",
       "path": "_notes/01.todo/SCHEMA Management.md"
     },
     {
       "basename": "LLM Wiki with a Knowledge Graph",
       "path": "_notes/02.notes/LLM Wiki with a Knowledge Graph.md"
-    },
-    {
-      "basename": "llm_wiki_arch",
-      "path": "_notes/02.notes/llm-wiki/llm_wiki_arch.canvas"
     },
     {
       "basename": "dbt-unit-testing",
@@ -195,10 +191,6 @@
     {
       "basename": "_PROMPT LOG",
       "path": "_notes/llm/_PROMPT LOG.md"
-    },
-    {
-      "basename": "LLM Benhmark - quality summary",
-      "path": "_notes/dp/LLM Benhmark - quality summary.md"
     }
   ],
   "omittedPaths": [],

@@ -6,7 +6,6 @@ tags:
 ---
 Discussione ipotesi GitFlow con SEACOM
 
-
 REVISIONE PIPELINE GITLAB CI/CD
 
 https://gitlab-test.dataliguria.it/sviluppo-data-platform/issue-tracker/-/issues/16#note_423
@@ -17,5 +16,5 @@ https://gitlab-test.dataliguria.it/sviluppo-data-platform/issue-tracker/-/issues
 - linting codice (sql/yaml) in ci/cd (dopo giugno)
 ## TODO (INTERNO LD)
 - test e definizione convenzioni per flow kestra
-- convenzione namespace kestra dev.'progetto'.*.yml
+- convenzione namespace kestra `dev.<PROGETTO>.yml`
 - definizione test in pre-commit
