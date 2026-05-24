@@ -7,14 +7,17 @@ Il retrieval (search lessicale + semantico + reranking) è delegato a [QMD](http
 ## Come usarlo come template
 
 ```bash
-# 1. Clona / copia la cartella in una nuova posizione
-cp -r /path/to/llm-wiki-template /path/to/my-new-wiki
+# 1a. Copia la cartella in una nuova posizione
+cp -r /path/to/llm-wiki-template /path/to/my-new-wiki 
+# 1b. Oppure clona il repository
+git clone https://github.com/fanenji/vault-template.git
+# 2. Spostati sulla nuova dir
 cd /path/to/my-new-wiki
 
-# 2. Setup dipendenze (markitdown, qmd, duckduckgo-search) e indice iniziale
+# 3. Setup dipendenze (markitdown, qmd, duckduckgo-search) e indice iniziale
 bash _system/scripts/init-vault.sh
 
-# 3. Apri la cartella in Obsidian (oppure ignora Obsidian e usa solo CLI/agente)
+# 4. Apri la cartella in Obsidian (oppure ignora Obsidian e usa solo CLI/agente)
 ```
 
 ## Struttura

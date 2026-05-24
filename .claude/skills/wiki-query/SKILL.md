@@ -17,11 +17,18 @@ Cerca nella wiki via [QMD](https://github.com/tobi/qmd) e sintetizza una rispost
 
 ## Prerequisiti
 
-- `qmd` installato globalmente (vedi `scripts/init-vault.sh`)
+- `qmd` installato globalmente (vedi `_system/scripts/init-vault.sh`)
 - Indice QMD inizializzato in `.llm-wiki/qmd-index.sqlite`
 - Almeno una pagina in `wiki/`
 
-Se l'indice non esiste, suggerisci all'utente di eseguire `bash scripts/init-vault.sh`.
+Se l'indice non esiste, suggerisci all'utente di eseguire `bash _system/scripts/init-vault.sh`.
+
+**Primo avvio — download modelli**: QMD scarica due modelli GGUF alla prima esecuzione (~400 MB totali). Se la query va in timeout con "timed out downloading a model":
+- Rilancia `qmd embed --db .llm-wiki/qmd-index.sqlite` su rete stabile, poi riprova.
+- Come fallback immediato usa `--no-rerank` (salta il secondo modello, usa RRF score):
+  ```bash
+  qmd query "<domanda>" --db "$QMD_DB" --no-rerank --json -n 8
+  ```
 
 ## Procedura
 

@@ -61,8 +61,30 @@ if [ ! -f "$QMD_DB" ]; then
 fi
 
 # ── Primo embed ───────────────────────────────────────────────────────────────
-echo "→ Generazione embeddings (primo run scarica modello GGUF, ~few minutes)..."
-qmd embed --db "$QMD_DB" || echo "⚠ embed fallito — riprova con: qmd embed --db $QMD_DB"
+echo "→ Generazione embeddings iniziali..."
+echo "  (Il primo run scarica il modello GGUF ~400 MB — richiede connessione, può"
+echo "   impiegare qualche minuto. Se va in timeout, rilancia: qmd embed --db $QMD_DB)"
+echo ""
+
+EMBED_OK=0
+for attempt in 1 2; do
+  if qmd embed --db "$QMD_DB"; then
+    EMBED_OK=1
+    break
+  fi
+  if [ $attempt -lt 2 ]; then
+    echo "⚠ embed fallito (tentativo $attempt) — attendo 5s e riprovo..."
+    sleep 5
+  fi
+done
+
+if [ $EMBED_OK -eq 0 ]; then
+  echo ""
+  echo "⚠ qmd embed non completato. Il modello potrebbe non essere stato scaricato."
+  echo "  Riprova manualmente quando hai connessione stabile:"
+  echo "    qmd embed --db $QMD_DB"
+  echo "  Finché l'embed non completa, wiki-query usa solo ricerca BM25 (--no-rerank)."
+fi
 
 # ── Secrets template ──────────────────────────────────────────────────────────
 if [ ! -f .llm-wiki/secrets.json ]; then
@@ -71,7 +93,7 @@ if [ ! -f .llm-wiki/secrets.json ]; then
   "TAVILY_API_KEY": ""
 }
 EOF
-  echo "✓ Creato .llm-wiki/secrets.json (compila TAVILY_API_KEY se userai deep-research)"
+  echo "✓ Creato .llm-wiki/secrets.json"
 fi
 
 echo ""
@@ -81,5 +103,10 @@ echo "Prossimi passi:"
 echo "  1. Modifica purpose.md con lo scope della tua wiki"
 echo "  2. Personalizza schema.md se necessario"
 echo "  3. Aggiungi documenti in raw/sources/"
-echo "  4. Apri la cartella in Obsidian (opzionale) o usa direttamente le skill"
+echo "  4. [Opzionale] Configura Tavily per deep-research con qualità migliore:"
+echo "       Apri .llm-wiki/secrets.json e inserisci la tua chiave:"
+echo "         { \"TAVILY_API_KEY\": \"tvly-xxxxxxxxxxxxxxxx\" }"
+echo "       Oppure: export TAVILY_API_KEY=\"tvly-...\" nel tuo shell profile."
+echo "       Senza Tavily il fallback DuckDuckGo è attivo automaticamente."
+echo "  5. Apri la cartella in Obsidian (opzionale) o usa direttamente le skill"
 echo ""

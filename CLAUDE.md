@@ -56,6 +56,22 @@ qmd embed --update                  # rinfresca l'indice dopo modifiche
 
 L'indice è in `.llm-wiki/qmd-index.sqlite`. Dopo ogni ingest, le skill chiamano `qmd embed --update` per mantenerlo coerente.
 
+**QMD — primo avvio**: al primo `qmd embed` e al primo `qmd query`, QMD scarica due modelli GGUF (~400 MB totali). Richiede connessione. Se il comando va in timeout:
+1. Rilancia `qmd embed --db .llm-wiki/qmd-index.sqlite` su una rete stabile.
+2. Per le query, usa `--no-rerank` per saltare il secondo modello: `qmd query "..." --no-rerank`.
+
+## Configurazione Tavily (deep-research)
+
+La skill `deep-research` usa Tavily di default e DuckDuckGo come fallback automatico. Per usare Tavily:
+
+1. Apri `.llm-wiki/secrets.json` (già creato da `init-vault.sh`, non committato):
+   ```json
+   { "TAVILY_API_KEY": "tvly-xxxxxxxxxxxxxxxx" }
+   ```
+2. Oppure: `export TAVILY_API_KEY="tvly-..."` nel tuo `.zshrc` / `.bashrc`.
+
+Senza Tavily il fallback DuckDuckGo è attivo automaticamente — non serve configurazione.
+
 ## Regole generali
 
 - Non cancellare file senza conferma esplicita dell'utente.
