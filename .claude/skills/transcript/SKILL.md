@@ -10,7 +10,6 @@ Trascrizione locale di file audio/video via [mlx_whisper](https://github.com/ml-
 ## Quando usarla
 
 - L'utente chiede di trascrivere file in `_inbox/transcription/`
-- Workflow `/meeting-ingest` ha bisogno di transcript come pre-step
 - Generico: "trascrivi <file>" o "trascrivi questa cartella"
 
 ## Prerequisiti

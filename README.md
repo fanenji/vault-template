@@ -1,6 +1,6 @@
 # LLM Wiki Template
 
-Vault Obsidian preconfigurata per essere gestita come knowledge base **LLM-driven**, derivata dal progetto [llm_wiki](https://github.com/nashsu/llm_wiki). Le funzionalità di backend (ingest, chat, lint, deep-research) sono implementate come **Agent Skills** invocabili da Claude Code, OpenCode, Pi e qualsiasi altro client compatibile, oppure direttamente da shell tramite gli script Python in `.claude/skills/*/scripts/`.
+Vault Obsidian preconfigurata per essere gestita come knowledge base **LLM-driven**, derivata dal progetto [llm_wiki](https://github.com/nashsu/llm_wiki). Le funzionalità (ingest, chat, lint, deep-research, transcript, graph-analyze) sono implementate come **Agent Skills** invocabili da Claude Code, OpenCode, Pi e qualsiasi altro client compatibile, oppure direttamente da shell tramite gli script Python in `.claude/skills/*/scripts/`.
 
 Il retrieval (search lessicale + semantico + reranking) è delegato a [QMD](https://github.com/tobi/qmd), un motore di ricerca locale che indicizza la cartella `wiki/`.
 
@@ -33,13 +33,17 @@ bash _system/scripts/init-vault.sh
 │   ├── sources/        # Riassunti delle fonti
 │   ├── queries/        # Risposte salvate da chat e deep-research
 │   └── synthesis/      # Analisi trasversali fra più fonti
+├── _inbox/             # Bucket per materiale in ingresso (clippings, journal, transcription)
+├── _notes/             # Note personali fuori dalla wiki knowledge base
 ├── .llm-wiki/          # Stato interno (queue ingest, cache SHA256, indice QMD)
 ├── .claude/
 │   ├── skills/         # Skill richiamabili da Claude Code / OpenCode / Pi
 │   │   ├── wiki-query/
 │   │   ├── wiki-lint/
 │   │   ├── wiki-ingest/
-│   │   └── deep-research/
+│   │   ├── deep-research/
+│   │   ├── transcript/
+│   │   └── graph-analyze/
 │   └── commands/       # Slash command thin wrapper (es. /wiki-query)
 ├── .opencode/          # Mirror (symlink) per OpenCode
 └── _system/            # Configurazione Obsidian + script vault
@@ -51,20 +55,27 @@ bash _system/scripts/init-vault.sh
 
 ## Skill disponibili
 
-| Skill | Cosa fa |
-|---|---|
-| `wiki-query` | Cerca nella wiki via QMD e risponde a una domanda con citazioni `[[wikilink]]` |
-| `wiki-lint` | Audit della wiki: orphan, broken-link, frontmatter, contraddizioni semantiche |
-| `wiki-ingest` | Ingest 2-step (analisi → generazione) di documenti da `raw/sources/` con cache SHA256 e coda persistente |
-| `deep-research` | Ricerca web multi-query (Tavily + DuckDuckGo fallback) → sintesi → auto-ingest |
+| Skill | Cosa fa | Slash command |
+|---|---|---|
+| `wiki-query` | Cerca nella wiki via QMD e risponde a una domanda con citazioni `[[wikilink]]` | `/wiki-query` |
+| `wiki-lint` | Audit della wiki: orphan, broken-link, frontmatter, contraddizioni semantiche | `/wiki-lint` |
+| `wiki-ingest` | Ingest 2-step (analisi → generazione) di documenti da `raw/sources/` con cache SHA256 e coda persistente | `/wiki-ingest`, `/inbox-ingest` |
+| `deep-research` | Ricerca web multi-query (Tavily + DuckDuckGo fallback) → sintesi → auto-ingest | `/deep-research` |
+| `transcript` | Trascrizione audio/video locale via `mlx_whisper` con summary opzionale via LLM | `/transcript` |
+| `graph-analyze` | Analisi del grafo wiki (nodi/edge/densità/orfani/hub) con report in `_notes/` | `/graph-analyze` |
 
 Tutte le skill sono **portabili**: il loro stato risiede in `.claude/skills/<nome>/`, sono in markdown standard, e gli script Python in `scripts/` sono eseguibili indipendentemente da qualsiasi agente.
 
 ## Requisiti
 
-- Python 3.10+ con `markitdown[all]`
-- Node.js 18+ con `@tobilu/qmd` (installato globalmente)
-- (Opzionale) Account [Tavily](https://tavily.com) per la deep-research; senza, fallback su DuckDuckGo
+**Core** (installati automaticamente da `_system/scripts/init-vault.sh`):
+- Python 3.10+ con `markitdown[all]` — preprocessing documenti per `wiki-ingest`
+- Python `duckduckgo-search` — fallback web search per `deep-research`
+- Node.js 18+ con `@tobilu/qmd` (installato globalmente) — motore di retrieval
+
+**Opzionali** (solo se usi le skill relative):
+- Account [Tavily](https://tavily.com) → `deep-research` (senza, fallback su DuckDuckGo)
+- `ffmpeg` (`brew install ffmpeg`) + `mlx-whisper` (`pip install mlx-whisper`) → `transcript` (richiede macOS Apple Silicon)
 
 ## Modello operativo
 
