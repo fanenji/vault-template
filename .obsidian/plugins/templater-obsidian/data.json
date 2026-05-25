@@ -1,0 +1,53 @@
+{
+  "command_timeout": 5,
+  "templates_folder": "_system/templates",
+  "templates_pairs": [
+    [
+      "",
+      ""
+    ]
+  ],
+  "trigger_on_file_creation": true,
+  "auto_jump_to_cursor": false,
+  "enable_system_commands": false,
+  "shell_path": "",
+  "user_scripts_folder": "",
+  "enable_folder_templates": false,
+  "folder_templates": [
+    {
+      "folder": "20 PROJECTS",
+      "template": "Templates/Note Template.md"
+    },
+    {
+      "folder": "30 WIKI",
+      "template": "Templates/Note Template.md"
+    },
+    {
+      "folder": "40 NOTE",
+      "template": "Templates/Note Template.md"
+    },
+    {
+      "folder": "50 IDEE",
+      "template": "Templates/Note Template.md"
+    },
+    {
+      "folder": "90 ARCHIVE",
+      "template": "Templates/Note Template.md"
+    }
+  ],
+  "enable_file_templates": true,
+  "file_templates": [
+    {
+      "regex": ".*",
+      "template": "_system/templates/Note Template.md"
+    }
+  ],
+  "syntax_highlighting": true,
+  "syntax_highlighting_mobile": false,
+  "enabled_templates_hotkeys": [
+    ""
+  ],
+  "startup_templates": [],
+  "intellisense_render": 1,
+  "enable_eta_for_user_scripts": false
+}

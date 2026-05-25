@@ -1,0 +1,54 @@
+{
+  "logoType": "default",
+  "logo": {
+    "lucideIcon": "",
+    "imagePath": "",
+    "imageLink": ""
+  },
+  "logoScale": 1.2,
+  "iconColorType": "default",
+  "wordmark": "Obsidian",
+  "customFont": "interfaceFont",
+  "fontSize": "4em",
+  "fontColorType": "default",
+  "fontWeight": 600,
+  "maxResults": 5,
+  "showbookmarkedFiles": true,
+  "showRecentFiles": false,
+  "maxRecentFiles": 5,
+  "storeRecentFile": true,
+  "showPath": true,
+  "selectionHighlight": "default",
+  "showShortcuts": true,
+  "markdownOnly": false,
+  "unresolvedLinks": false,
+  "recentFilesStore": [
+    {
+      "filepath": "_notes/01.todo/01.todo.md",
+      "timestamp": 1779722027843
+    },
+    {
+      "filepath": "_notes/02.notes/llm-wiki/llm-wiki.md",
+      "timestamp": 1779722025873
+    },
+    {
+      "filepath": "README.md",
+      "timestamp": 1779722023130
+    },
+    {
+      "filepath": "wiki/comparisons 2/comparisons 2.md",
+      "timestamp": 1779721952358
+    },
+    {
+      "filepath": "wiki/concepts 2/concepts 2.md",
+      "timestamp": 1779721943549
+    }
+  ],
+  "bookmarkedFileStore": [],
+  "searchDelay": 0,
+  "replaceNewTabs": true,
+  "newTabOnStart": false,
+  "closePreviousSessionTabs": false,
+  "omnisearch": false,
+  "showOmnisearchExcerpt": true
+}

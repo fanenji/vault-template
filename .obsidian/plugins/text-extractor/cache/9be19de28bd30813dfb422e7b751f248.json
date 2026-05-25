@@ -1,0 +1,1 @@
+{"path":"99 System/attachments/Architettura 5t/arch_mapserver_5t.png","text":"System architecture Internet-facing proxy Internet-facing proxy REVS (O NGINX I < | Vehicle positions Webapp Routing engine | Geocoding engine Map server Analytics mqtt Digitransit oTP Pelias Digitransit Piwik","libVersion":"0.5.0","langs":"eng"}

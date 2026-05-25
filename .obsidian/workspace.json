@@ -1,0 +1,326 @@
+{
+  "main": {
+    "id": "1282aa51a5d6cc49",
+    "type": "split",
+    "children": [
+      {
+        "id": "399ae098c65289cf",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "a6a091924058ccb7",
+            "type": "leaf",
+            "pinned": true,
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "_notes/01.todo/01.todo.md",
+                "mode": "source",
+                "source": false
+              },
+              "pinned": true,
+              "icon": "lucide-file",
+              "title": "01.todo"
+            }
+          },
+          {
+            "id": "1fe5236b9c59fe05",
+            "type": "leaf",
+            "pinned": true,
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "_notes/02.notes/Pi Agent/Pi Agent.md",
+                "mode": "source",
+                "source": false
+              },
+              "pinned": true,
+              "icon": "lucide-file",
+              "title": "Pi Agent"
+            }
+          },
+          {
+            "id": "4c7520f944f9d698",
+            "type": "leaf",
+            "pinned": true,
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "_notes/02.notes/llm-wiki/llm-wiki.md",
+                "mode": "source",
+                "source": false
+              },
+              "pinned": true,
+              "icon": "lucide-file",
+              "title": "llm-wiki"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "b04db8e4311ac96c",
+    "type": "split",
+    "children": [
+      {
+        "id": "8f0c07991cc61d0d",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9ba77e1adad623f9",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "dff452d88478c8b9",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": true,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "4a7b444cf29a0a0d",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          },
+          {
+            "id": "bf1e32ca39b5da46",
+            "type": "leaf",
+            "state": {
+              "type": "msg-handler-search-view",
+              "state": {},
+              "icon": "lucide-ghost",
+              "title": "msg-handler-search-view"
+            }
+          },
+          {
+            "id": "bdd25fe06dd86646",
+            "type": "leaf",
+            "state": {
+              "type": "recent-files",
+              "state": {},
+              "icon": "lucide-ghost",
+              "title": "recent-files"
+            }
+          },
+          {
+            "id": "188f22e970020c33",
+            "type": "leaf",
+            "state": {
+              "type": "msg-handler-search-view",
+              "state": {},
+              "icon": "MSG_HANDLER_ENVELOPE_ICON",
+              "title": "MSG Handler Search"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 414.5
+  },
+  "right": {
+    "id": "45ad9902070877bf",
+    "type": "split",
+    "children": [
+      {
+        "id": "4e8dc638b1dca972",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "08408ab6d1ccc5c2",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "40 NOTE/STEFANO/ESERCIZI/ALTRI.md",
+                "collapseAll": true,
+                "extraContext": true,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for ALTRI"
+            }
+          },
+          {
+            "id": "2176a6c0f06b4351",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "00 TODO/PRIIMIT.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from PRIIMIT"
+            }
+          },
+          {
+            "id": "d53f0e025ff5d5f2",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etichette"
+            }
+          },
+          {
+            "id": "f6b828505ab02426",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "27b99b7c8e209bf6",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "_notes/01.todo/01.todo.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of 01.todo"
+            }
+          },
+          {
+            "id": "77b3a5d93569c154",
+            "type": "leaf",
+            "state": {
+              "type": "git-view",
+              "state": {},
+              "icon": "lucide-ghost",
+              "title": "git-view"
+            }
+          },
+          {
+            "id": "6cfaddef6dd1f92c",
+            "type": "leaf",
+            "state": {
+              "type": "git-history-view",
+              "state": {},
+              "icon": "lucide-ghost",
+              "title": "git-history-view"
+            }
+          }
+        ],
+        "currentTab": 4
+      }
+    ],
+    "direction": "horizontal",
+    "width": 224.5
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "zk-prefixer:Create new unique note": false,
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false,
+      "obsidian-git:Open Git source control": false,
+      "msg-handler:MSG Handler": false,
+      "templater-obsidian:Templater": false,
+      "omnisearch:Omnisearch": false
+    }
+  },
+  "active": "a6a091924058ccb7",
+  "lastOpenFiles": [
+    "_notes/02.notes/llm-wiki/llm-wiki.md",
+    "README.md",
+    "wiki/comparisons 2/comparisons 2.md",
+    "wiki/concepts 2/concepts 2.md",
+    "wiki/queries 2/queries 2.md",
+    "wiki/synthesis 2/synthesis 2.md",
+    "wiki/sources 2/sources 2.md",
+    "wiki/queries 2",
+    "wiki/synthesis 2",
+    "wiki/sources 2",
+    "wiki/comparisons 2",
+    "wiki/wiki.md",
+    "wiki/concepts 2",
+    "wiki/entities/entities 3.md",
+    "wiki/entities/entities 4.md",
+    "wiki/entities 2/entities 2.md",
+    "wiki/entities/entities 2.md",
+    "wiki/entities 2/zvec.md",
+    "wiki/entities 2/zep.md",
+    "wiki/entities 2/zar.md",
+    "wiki/entities 2/z-image-turbo.md",
+    "wiki/entities 2/yash-solanki.md",
+    "wiki/entities 2/wispr-flow.md",
+    "wiki/entities 2/web-inf.md",
+    "wiki/entities 2/vue-js.md",
+    "wiki/entities 2/vue-3.md",
+    "wiki/entities 2/vscode-quick-action.md",
+    "wiki/entities 2/vmware-fusion.md",
+    "wiki/entities 2/vllm-mlx.md",
+    "wiki/entities 2/vishal-mysore.md",
+    "wiki/entities 2/vector-db-bench.md",
+    "wiki/entities 2",
+    "wiki/entities",
+    "wiki/sources",
+    "wiki/concepts",
+    "wiki/synthesis",
+    "_notes/02.notes/llm-wiki/llm_wiki_arch.canvas",
+    "_system/attachments/Pasted image 20260419200940.png",
+    "99 System/attachments/ALTER/marc mambas million manias article.png",
+    "99 System/attachments/ALTER/marc mambas million manias atricle.png",
+    "_system/attachments/HE7dq-1aIAAB6Df.jpg",
+    "_system/attachments/HE_h9z1WMAERjR0.jpg",
+    "_system/attachments/HE9oOlObgAALJoB.jpg",
+    "_system/attachments/Pasted image 20260322080602.png",
+    "99 System/attachments/Pasted image 20260322080519.png",
+    "_system/attachments/Pasted image 20260308180034.png",
+    "_system/attachments/Pasted image 20260308175952.png",
+    "20 PROJECTS/DATA PLATFORM/DATA PLATFORM.canvas",
+    "30 WIKI/DATA PLATFORM/KESTRA/GitFlow.canvas"
+  ]
+}

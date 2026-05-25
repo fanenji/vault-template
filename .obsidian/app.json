@@ -1,0 +1,17 @@
+{
+  "alwaysUpdateLinks": true,
+  "attachmentFolderPath": "99 System/attachments",
+  "promptDelete": false,
+  "showUnsupportedFiles": true,
+  "trashOption": "local",
+  "pdfExportSettings": {
+    "includeName": true,
+    "pageSize": "A4",
+    "landscape": false,
+    "margin": "0",
+    "downscalePercent": 100
+  },
+  "showLineNumber": false,
+  "showInlineTitle": true,
+  "readableLineLength": false
+}
