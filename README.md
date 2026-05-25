@@ -1,6 +1,6 @@
 # LLM Wiki Template
 
-Vault Obsidian preconfigurata per essere gestita come knowledge base **LLM-driven**, derivata dal progetto [llm_wiki](https://github.com/nashsu/llm_wiki). Le funzionalità (ingest, chat, lint, deep-research, transcript, graph-analyze) sono implementate come **Agent Skills** invocabili da Claude Code, OpenCode, Pi e qualsiasi altro client compatibile, oppure direttamente da shell tramite gli script Python in `.claude/skills/*/scripts/`.
+Vault Obsidian preconfigurata per essere gestita come knowledge base **LLM-driven**, ispirata dal progetto [llm_wiki](https://github.com/nashsu/llm_wiki). Le funzionalità (ingest, chat, lint, deep-research, transcript, graph-analyze) sono implementate come **Agent Skills** invocabili da Claude Code, OpenCode, Pi e qualsiasi altro client compatibile, oppure direttamente da shell tramite gli script Python in `.claude/skills/*/scripts/`.
 
 Il retrieval (search lessicale + semantico + reranking) è delegato a [QMD](https://github.com/tobi/qmd), un motore di ricerca locale che indicizza la cartella `wiki/`.
 
