@@ -134,6 +134,16 @@
             "state": {
               "type": "msg-handler-search-view",
               "state": {},
+              "icon": "lucide-ghost",
+              "title": "msg-handler-search-view"
+            }
+          },
+          {
+            "id": "760c551d42466d08",
+            "type": "leaf",
+            "state": {
+              "type": "msg-handler-search-view",
+              "state": {},
               "icon": "MSG_HANDLER_ENVELOPE_ICON",
               "title": "MSG Handler Search"
             }
@@ -142,7 +152,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 414.5
+    "width": 204.5
   },
   "right": {
     "id": "45ad9902070877bf",
@@ -254,7 +264,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 224.5
+    "width": 200
   },
   "left-ribbon": {
     "hiddenItems": {
