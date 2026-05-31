@@ -79,6 +79,12 @@ export class PiRunner {
         return;
       }
 
+      // Chiudi subito stdin: con `pi -p` non passiamo input, ma se lo stdin del
+      // child resta una pipe aperta pi resta in attesa di EOF e non emette nulla
+      // (sintomo: "In esecuzione…" infinito, nessun processo che produce output
+      // sotto Electron). end() invia EOF immediato e pi parte.
+      child.stdin.end();
+
       const onAbort = () => child.kill("SIGTERM");
       if (opts.signal) {
         if (opts.signal.aborted) onAbort();
@@ -137,6 +143,7 @@ export class PiRunner {
         reject(e);
         return;
       }
+      child.stdin.end(); // EOF immediato: evita che pi resti in attesa di stdin
       child.stdout.on("data", (d: Buffer) => (out += d.toString()));
       child.stderr.on("data", (d: Buffer) => (err += d.toString()));
       child.on("error", reject);

@@ -251,6 +251,7 @@ var PiRunner = class {
         resolve(1);
         return;
       }
+      child.stdin.end();
       const onAbort = () => child.kill("SIGTERM");
       if (opts.signal) {
         if (opts.signal.aborted)
@@ -308,6 +309,7 @@ var PiRunner = class {
         reject(e);
         return;
       }
+      child.stdin.end();
       child.stdout.on("data", (d) => out += d.toString());
       child.stderr.on("data", (d) => err += d.toString());
       child.on("error", reject);
