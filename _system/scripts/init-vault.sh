@@ -49,26 +49,33 @@ if [ ! -f .llm-wiki/config.json ]; then
   echo "✓ Creato .llm-wiki/config.json (modifica se necessario)"
 fi
 
-# ── Collection QMD ────────────────────────────────────────────────────────────
-# QMD usa un suo store; lo configuriamo per puntare a wiki/ con DB locale.
+# ── Indice + collection QMD ───────────────────────────────────────────────────
+# QMD 2.5.2 usa un indice project-local in `.qmd/` (discovery dal cwd, come git).
+# `qmd init` lo crea; `qmd collection add ./wiki` indicizza la cartella wiki/.
+# NB: il vecchio flag `--db .llm-wiki/qmd-index.sqlite` non esiste più ed è ignorato.
 mkdir -p .llm-wiki
-QMD_DB=".llm-wiki/qmd-index.sqlite"
 
-if [ ! -f "$QMD_DB" ]; then
+if [ ! -d ".qmd" ]; then
+  echo "→ Creazione indice QMD locale (.qmd/)..."
+  qmd init || true
+fi
+
+# Aggiungi la collection 'wiki' se non già presente nell'indice locale.
+if ! qmd collection list 2>/dev/null | grep -q "wiki"; then
   echo "→ Configurazione collection QMD su wiki/..."
-  qmd collection add "$VAULT_ROOT/wiki" --name wiki --db "$QMD_DB" || true
-  qmd context add qmd://wiki "Wiki pages — entities, concepts, sources, queries, synthesis" --db "$QMD_DB" || true
+  qmd collection add ./wiki || true
+  qmd context add qmd://wiki "Wiki pages — entities, concepts, sources, queries, synthesis" || true
 fi
 
 # ── Primo embed ───────────────────────────────────────────────────────────────
 echo "→ Generazione embeddings iniziali..."
 echo "  (Il primo run scarica il modello GGUF ~400 MB — richiede connessione, può"
-echo "   impiegare qualche minuto. Se va in timeout, rilancia: qmd embed --db $QMD_DB)"
+echo "   impiegare qualche minuto. Se va in timeout, rilancia: qmd update && qmd embed)"
 echo ""
 
 EMBED_OK=0
 for attempt in 1 2; do
-  if qmd embed --db "$QMD_DB"; then
+  if qmd update && qmd embed; then
     EMBED_OK=1
     break
   fi
@@ -82,7 +89,7 @@ if [ $EMBED_OK -eq 0 ]; then
   echo ""
   echo "⚠ qmd embed non completato. Il modello potrebbe non essere stato scaricato."
   echo "  Riprova manualmente quando hai connessione stabile:"
-  echo "    qmd embed --db $QMD_DB"
+  echo "    qmd update && qmd embed"
   echo "  Finché l'embed non completa, wiki-query usa solo ricerca BM25 (--no-rerank)."
 fi
 

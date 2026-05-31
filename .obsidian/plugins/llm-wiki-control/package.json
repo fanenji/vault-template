@@ -1,0 +1,19 @@
+{
+  "name": "llm-wiki-control",
+  "version": "0.1.0",
+  "description": "Obsidian control panel for llm-wiki Agent Skills (pilots pi headless).",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+  },
+  "keywords": [],
+  "author": "llm-wiki",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "esbuild": "^0.20.0",
+    "obsidian": "^1.5.0",
+    "typescript": "^5.4.0"
+  }
+}

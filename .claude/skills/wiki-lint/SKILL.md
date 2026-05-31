@@ -103,7 +103,7 @@ Se l'utente passa `--fix`:
 - Per ogni `frontmatter` warning di "missing field": aggiungi i campi mancanti con valori sensati (`created: <oggi>`, `title: <titolo dedotto dal filename>`, ecc.).
 - Per ogni `missing-page` info di suggerimento (semantica): **non** auto-correggere, mostra solo come suggerimento all'utente (rinominare wikilink è ad alto rischio).
 
-Dopo `--fix`, esegui `qmd embed --update --db .llm-wiki/qmd-index.sqlite` per riaggiornare l'indice.
+Dopo `--fix`, esegui `qmd update && qmd embed` (dalla vault root) per riaggiornare l'indice.
 
 ## Esempio d'uso
 
@@ -118,6 +118,6 @@ Dopo `--fix`, esegui `qmd embed --update --db .llm-wiki/qmd-index.sqlite` per ri
 
 ## Errori comuni
 
-- **`qmd: command not found`** → suggerisci `bash scripts/init-vault.sh` o `npm install -g @tobilu/qmd`
-- **`qmd-index.sqlite` non esiste** → `qmd embed --db .llm-wiki/qmd-index.sqlite` (primo embed lento, scarica modello)
+- **`qmd: command not found`** → suggerisci `bash _system/scripts/init-vault.sh` o `npm install -g @tobilu/qmd`
+- **indice QMD assente** (manca `.qmd/`) → `qmd init && qmd collection add ./wiki && qmd update && qmd embed` dalla vault root (primo embed lento, scarica modello). qmd 2.5.2 usa l'indice project-local `.qmd/`, non più `--db .llm-wiki/qmd-index.sqlite`.
 - **Frontmatter parse warning su molte pagine** → forse la vault non aderisce ancora al schema; suggerisci `--fix` o di aggiornare schema.md

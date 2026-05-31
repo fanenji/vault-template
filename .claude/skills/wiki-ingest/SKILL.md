@@ -128,6 +128,7 @@ Output JSON con:
 - `reviews`: blocchi REVIEW estratti (passa al review queue se l'utente lo vuole)
 - `merge_needed`: lista pagine che necessitano LLM body merge (vedi Step 6)
 - `hard_failures`: errori FS irrecuperabili
+- `archived_source`: path (rel) del sorgente spostato in `raw/sources/`, oppure `null`
 
 `finalize.py` si occupa automaticamente di:
 - Sanitize (rimuove code fence, ripara frontmatter)
@@ -135,7 +136,8 @@ Output JSON con:
 - Append a `wiki/log.md`
 - Overwrite di `wiki/index.md` e `wiki/overview.md`
 - Save cache SHA256 (se nessun hard failure)
-- `qmd embed --update` (aggiorna indice)
+- `qmd update && qmd embed` (re-indicizza + embedda i nuovi file; indice locale `.qmd/` di qmd 2.5.2)
+- **Archiviazione sorgente**: su ingest pienamente riuscito sposta l'originale da `_inbox/` a `raw/sources/` (move). Se è già sotto `raw/sources/` non lo tocca. Disattivabile con `--no-archive`. **Non devi spostare il file a mano**: lo fa lo script.
 
 ### Step 6 — Page merge LLM (se `merge_needed` non vuoto)
 
@@ -179,15 +181,17 @@ Skill:
 4. Leggo prompts/generation.md, sostituisco, chiamata LLM → /tmp/generation.txt
 5. finalize.py --source _inbox/transformer-paper.pdf --generation-file /tmp/generation.txt
    → { written_paths: [wiki/sources/transformer-paper.md, wiki/entities/vaswani-et-al.md, ...],
-       warnings: [], reviews: [], merge_needed: [...] }
+       warnings: [], reviews: [], merge_needed: [...],
+       archived_source: "raw/sources/transformer-paper.pdf" }
+   (finalize.py ha già spostato il sorgente da _inbox a raw/sources)
 6. Per ogni merge_needed: chiamata LLM merge → write
-7. Sposto _inbox/transformer-paper.pdf → raw/sources/transformer-paper.pdf
-8. Report all'utente.
+7. Report all'utente (cita `archived_source`).
 ```
 
 ## Note importanti
 
-- **NON ingerire da `raw/sources/`** direttamente se il file viene da `_inbox/`: prima sposta in `raw/sources/` (questo è il pattern del backend originale — `raw/` è la "source of truth" immutabile).
+- **Archiviazione automatica del sorgente**: `finalize.py` sposta da solo `_inbox/<file>` → `raw/sources/<file>` su ingest riuscito (`raw/` è la "source of truth" immutabile). **Non spostarlo a mano.** Per saltare l'archiviazione usa `finalize.py --no-archive`.
+- **NON ingerire da `raw/sources/`** direttamente se il file viene da `_inbox/` (verrebbe processato sul posto senza spostamento).
 - **Lingua**: i prompt sono in inglese ma l'output rispetta la lingua della source (rule built-in). Se la wiki è multilingua e l'utente vuole forzare l'italiano, aggiungi alla user message: `Output language: Italian.`
 - **Batch grossi** (>10 file): processa uno per volta, non parallelizzare. Il pipeline a 2 step satura il context; ingest paralleli rischiano errori.
 - **Idempotente**: rilancia la skill su un file già ingerito → la cache restituisce HIT e nulla viene riscritto. Forza re-ingest con `python cache.py remove <filename>`.

@@ -10,7 +10,7 @@ e fa:
   4. Append a log.md
   5. Overwrite di index.md e overview.md
   6. Save cache SHA256
-  7. Aggiorna l'indice QMD (qmd embed --update)
+  7. Aggiorna l'indice QMD (qmd update && qmd embed)
 
 Stampa su stdout un riassunto JSON: { written_paths, warnings, reviews,
 merge_needed: [{path, existing, incoming}, ...] }.
@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -80,6 +81,7 @@ def finalize(
     generation_text: str,
     skip_cache: bool = False,
     skip_qmd_update: bool = False,
+    skip_archive: bool = False,
 ) -> dict:
     """
     Esegue il finalize. Ritorna un dict con:
@@ -152,18 +154,42 @@ def finalize(
         except Exception as e:
             warnings.append(f"Failed to save cache: {e}")
 
-    # QMD index update
+    # QMD index update (qmd 2.5.2: indice project-local .qmd/, discovery dal cwd).
+    # `qmd update` re-indicizza le collection (rileva i file nuovi/rimossi),
+    # `qmd embed` genera i vettori mancanti. cwd = vault_root → usa l'indice locale.
     if not skip_qmd_update and written_paths:
-        qmd_db = vault_root / ".llm-wiki" / "qmd-index.sqlite"
         try:
-            subprocess.run(
-                ["qmd", "embed", "--update", "--db", str(qmd_db)],
-                timeout=300,
-                check=False,
-                capture_output=True,
-            )
+            for cmd in (["qmd", "update"], ["qmd", "embed"]):
+                subprocess.run(
+                    cmd,
+                    cwd=str(vault_root),
+                    timeout=300,
+                    check=False,
+                    capture_output=True,
+                )
         except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-            warnings.append(f"QMD embed update failed: {e} (run `qmd embed --update` manually)")
+            warnings.append(f"QMD index update failed: {e} (run `qmd update && qmd embed` manually)")
+
+    # Archiviazione sorgente (solo su ingest pienamente riuscito): sposta
+    # l'originale da _inbox a raw/sources/ (raw/ = source of truth immutabile).
+    # Se l'originale è già sotto raw/sources/ non si tocca.
+    archived_source: str | None = None
+    if not skip_archive and written_paths and not hard_failures:
+        try:
+            src = source_path.resolve()
+            raw_sources = (vault_root / "raw" / "sources").resolve()
+            already_archived = raw_sources in src.parents
+            if src.exists() and not already_archived:
+                raw_sources.mkdir(parents=True, exist_ok=True)
+                dest = raw_sources / src.name
+                if dest.exists():
+                    # Copia già archiviata: rimuovo solo l'originale da _inbox.
+                    src.unlink()
+                else:
+                    shutil.move(str(src), str(dest))
+                archived_source = str(dest.relative_to(vault_root))
+        except OSError as e:
+            warnings.append(f"Archiviazione sorgente fallita: {e} (sposta manualmente in raw/sources/)")
 
     return {
         "written_paths": written_paths,
@@ -171,6 +197,7 @@ def finalize(
         "reviews": reviews,
         "merge_needed": merge_needed,
         "hard_failures": hard_failures,
+        "archived_source": archived_source,
     }
 
 
@@ -181,6 +208,8 @@ def main() -> int:
                     help="File con l'output grezzo dello step-2 generation")
     ap.add_argument("--skip-cache", action="store_true", help="Non salvare la cache SHA256")
     ap.add_argument("--skip-qmd-update", action="store_true", help="Non aggiornare l'indice QMD")
+    ap.add_argument("--no-archive", action="store_true",
+                    help="Non spostare il sorgente in raw/sources/ dopo l'ingest")
     args = ap.parse_args()
 
     vault_root = find_vault_root(Path.cwd())
@@ -192,6 +221,7 @@ def main() -> int:
         generation_text=generation_text,
         skip_cache=args.skip_cache,
         skip_qmd_update=args.skip_qmd_update,
+        skip_archive=args.no_archive,
     )
 
     print(json.dumps(result, indent=2, ensure_ascii=False))
