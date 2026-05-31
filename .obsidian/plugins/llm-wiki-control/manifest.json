@@ -1,0 +1,9 @@
+{
+  "id": "llm-wiki-control",
+  "name": "LLM Wiki Control",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Pannello di controllo per le Agent Skills della llm-wiki: lancia wiki-ingest / wiki-query via pi in headless, con streaming live e storico delle sessioni.",
+  "author": "llm-wiki",
+  "isDesktopOnly": true
+}
