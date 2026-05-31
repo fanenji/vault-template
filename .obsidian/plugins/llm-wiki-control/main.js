@@ -718,6 +718,10 @@ var QueryPanel = class {
       this.log.clear();
       new import_obsidian3.Notice("Nuova conversazione");
     };
+    const saveRow = this.root.createDiv({ cls: "llm-wiki-save-row" });
+    const saveLabel = saveRow.createEl("label", { cls: "llm-wiki-save-label" });
+    this.saveCheckbox = saveLabel.createEl("input", { attr: { type: "checkbox" } });
+    saveLabel.createSpan({ text: " Salva la risposta in wiki/queries/" });
     this.log = new StreamLog(this.root, this.getSettings().showThinking);
     this.root.createEl("h4", { text: "Storico query" });
     this.historyEl = this.root.createDiv({ cls: "llm-wiki-history" });
@@ -771,7 +775,8 @@ var QueryPanel = class {
       new import_obsidian3.Notice("Nessuna sessione attiva: usa 'Cerca' per iniziarne una");
       return;
     }
-    const prompt = `[llm-wiki:query] ${text}`;
+    const saveSuffix = this.saveCheckbox.checked ? " Salva la risposta come pagina in wiki/queries/ (step 4 della skill) e aggiorna l'indice QMD." : "";
+    const prompt = `[llm-wiki:query] ${text}${saveSuffix}`;
     this.running = true;
     if (!asFollowUp)
       this.log.clear();

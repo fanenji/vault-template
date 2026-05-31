@@ -13,6 +13,7 @@ export class QueryPanel {
   private textarea!: HTMLTextAreaElement;
   private historyEl!: HTMLElement;
   private log!: StreamLog;
+  private saveCheckbox!: HTMLInputElement;
   private running = false;
   // Sessione corrente per i follow-up (resume via --session).
   private activeSessionId: string | null = null;
@@ -51,6 +52,13 @@ export class QueryPanel {
       this.log.clear();
       new Notice("Nuova conversazione");
     };
+
+    // Opzione: salvare la risposta come pagina in wiki/queries/. Di default off —
+    // wiki-query salva solo su richiesta esplicita; questa checkbox la inietta.
+    const saveRow = this.root.createDiv({ cls: "llm-wiki-save-row" });
+    const saveLabel = saveRow.createEl("label", { cls: "llm-wiki-save-label" });
+    this.saveCheckbox = saveLabel.createEl("input", { attr: { type: "checkbox" } });
+    saveLabel.createSpan({ text: " Salva la risposta in wiki/queries/" });
 
     this.log = new StreamLog(this.root, this.getSettings().showThinking);
 
@@ -111,7 +119,10 @@ export class QueryPanel {
       return;
     }
 
-    const prompt = `[llm-wiki:query] ${text}`;
+    const saveSuffix = this.saveCheckbox.checked
+      ? " Salva la risposta come pagina in wiki/queries/ (step 4 della skill) e aggiorna l'indice QMD."
+      : "";
+    const prompt = `[llm-wiki:query] ${text}${saveSuffix}`;
     this.running = true;
     if (!asFollowUp) this.log.clear();
     const signal = this.log.beginRun();
