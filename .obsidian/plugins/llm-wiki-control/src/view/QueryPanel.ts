@@ -124,6 +124,7 @@ export class QueryPanel {
       signal,
       onEvent: (ev) => {
         if (ev.kind === "exit") this.log.endRun(ev.code);
+        else if (ev.kind === "session") this.activeSessionId = ev.id;
         else this.log.append(ev);
       },
     });

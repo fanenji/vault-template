@@ -29,12 +29,11 @@ npm run build      # tsc -noEmit + esbuild → main.js
 
 ## Verifica runtime (sul Mac, dove `pi` è installato)
 
-Il container di sviluppo non ha `pi` né Obsidian: questi step vanno eseguiti localmente.
-
-1. **Schema eventi** — nella vault root:
-   `pi -p --mode json "ciao"`
-   Confronta i nomi-campo con `src/runner/events.ts`. Se differiscono, adatta
-   `normalizeRawEvent` (cerca il commento `TODO confermare schema`).
+1. **Schema eventi** — ✅ confermato su `pi v0.78`. Lo stream live usa delta
+   incrementali (`message_update.assistantMessageEvent.text_delta`), il reasoning
+   arriva su `thinking_end`, i tool su `tool_execution_start`; lo storico dai file
+   di sessione usa righe `type:"message"` con `content[]`. Tutto gestito da
+   `normalizeRawEvent` in `src/runner/events.ts` (vedi commento iniziale del file).
 2. **Runner isolato**:
    `pi -p --mode json --skill .claude/skills/wiki-query "Cosa sappiamo su X?"`
    → conferma lo streaming e la creazione di un `.jsonl` in

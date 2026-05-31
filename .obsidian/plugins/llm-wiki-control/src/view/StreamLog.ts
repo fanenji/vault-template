@@ -97,6 +97,10 @@ export class StreamLog {
         // gestito da endRun()
         break;
       }
+      case "session": {
+        // id catturato dal QueryPanel; nessun render.
+        break;
+      }
     }
     this.logEl.scrollTop = this.logEl.scrollHeight;
   }

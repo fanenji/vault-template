@@ -1,12 +1,34 @@
 // Eventi normalizzati emessi dal runner verso la UI.
 //
-// TODO confermare schema: i nomi-campo di `pi --mode json` non sono stati
-// verificabili nel container di sviluppo (pi gira solo sul Mac dell'utente).
-// La normalizzazione qui sotto e' tollerante: parse di ogni riga JSON e switch
-// su `type` / `message.role`, ignorando i campi sconosciuti. Se lo schema reale
-// differisce, adattare `normalizeRawEvent`.
+// Schema verificato su pi v0.78 (`pi --mode json`). Esistono DUE formati di riga
+// che convergono qui (lo stesso normalizer serve sia lo stream live del runner
+// sia il re-render dello storico da `sessionStore.loadSession`):
+//
+//  1. STREAM LIVE (stdout di `pi -p --mode json`):
+//     - { type: "session", id, cwd, ... }                      → inizio sessione
+//     - { type: "message_update", assistantMessageEvent: {     → delta incrementali
+//         type: "text_delta",    delta: "..."                  → testo token-by-token
+//         type: "thinking_delta",delta: "..."                  → reasoning token-by-token
+//         type: "thinking_end",  content: "..."                → reasoning completo
+//         ... (text_start/end, thinking_start, toolcall_* ignorati)
+//       } }
+//     - { type: "tool_execution_start", toolName, args }       → esecuzione tool
+//     - message_start / message_end / turn_* / agent_* / tool_execution_update|end
+//       → ignorati di proposito (message_start/end portano content[] e
+//         causerebbero echo del prompt + duplicazione del testo gia' streammato)
+//
+//  2. FILE DI SESSIONE (~/.pi/agent/sessions/*.jsonl, righe `type: "message"`):
+//     - { type: "message", message: { role, content: [
+//         { type: "text", text },
+//         { type: "thinking", thinking },
+//         { type: "toolCall", name, arguments } ] } }
+//
+// I due formati sono separati dal valore di `type` (lo stream usa
+// message_update/message_start/...; i file di sessione usano il `message` puro),
+// quindi un singolo switch li discrimina senza ambiguita'.
 
 export type StreamEvent =
+  | { kind: "session"; id: string }
   | { kind: "text"; text: string }
   | { kind: "thinking"; text: string }
   | { kind: "toolCall"; name: string; detail?: string }
@@ -14,27 +36,29 @@ export type StreamEvent =
   | { kind: "error"; message: string }
   | { kind: "exit"; code: number | null };
 
-// Forma "best effort" delle righe emesse da pi --mode json. Speculativa: tutti i
-// campi sono opzionali, cosi' il parser non si rompe su varianti di schema.
+// Parte di contenuto dentro un messaggio completo (formato file di sessione).
+interface ContentPart {
+  type?: string;
+  text?: string;
+  thinking?: string;
+  name?: string;
+  arguments?: unknown;
+  input?: unknown;
+}
+
+// Forma delle righe di pi --mode json rilevanti per la UI. Tutti i campi sono
+// opzionali: il parser ignora silenziosamente le righe/varianti non gestite.
 interface RawPiEvent {
   type?: string;
-  message?: {
-    role?: string;
-    content?: Array<{
-      type?: string;
-      text?: string;
-      name?: string;
-      // toolCall puo' avere nomi diversi (name / tool / toolName)
-      tool?: string;
-      toolName?: string;
-      input?: unknown;
-      arguments?: unknown;
-    }>;
-  };
-  // varianti top-level possibili
-  text?: string;
+  id?: string;
   error?: string;
-  result?: unknown;
+  // type === "message" (file di sessione)
+  message?: { role?: string; content?: ContentPart[] };
+  // type === "message_update" (stream live)
+  assistantMessageEvent?: { type?: string; delta?: string; content?: string };
+  // type === "tool_execution_start" (stream live)
+  toolName?: string;
+  args?: unknown;
 }
 
 function stringifyDetail(value: unknown): string | undefined {
@@ -48,47 +72,78 @@ function stringifyDetail(value: unknown): string | undefined {
   }
 }
 
+// Estrae gli StreamEvent dalle parti di un messaggio completo (file di sessione).
+function partsToEvents(content: ContentPart[]): StreamEvent[] {
+  const out: StreamEvent[] = [];
+  for (const part of content) {
+    const ptype = part?.type;
+    if (ptype === "text" && typeof part.text === "string") {
+      out.push({ kind: "text", text: part.text });
+    } else if (ptype === "thinking" && typeof part.thinking === "string") {
+      // NB: nelle parti "thinking" il testo sta nel campo `thinking`, non `text`.
+      out.push({ kind: "thinking", text: part.thinking });
+    } else if (ptype === "toolCall" || ptype === "tool_use" || ptype === "tool_call") {
+      out.push({
+        kind: "toolCall",
+        name: part.name ?? "tool",
+        detail: stringifyDetail(part.arguments ?? part.input),
+      });
+    }
+  }
+  return out;
+}
+
 // Converte una riga JSON grezza in zero o piu' StreamEvent normalizzati.
 export function normalizeRawEvent(raw: unknown): StreamEvent[] {
   if (raw == null || typeof raw !== "object") return [];
   const e = raw as RawPiEvent;
   const out: StreamEvent[] = [];
 
-  // Errori top-level
+  // Errori top-level (qualsiasi tipo di evento puo' portarli).
   if (typeof e.error === "string" && e.error.length > 0) {
     out.push({ kind: "error", message: e.error });
   }
 
-  // Messaggi con content[] (formato analogo alle righe JSONL di sessione)
-  const content = e.message?.content;
-  if (Array.isArray(content)) {
-    for (const part of content) {
-      const ptype = part?.type;
-      if (ptype === "text" && typeof part.text === "string") {
-        out.push({ kind: "text", text: part.text });
-      } else if (ptype === "thinking" && typeof part.text === "string") {
-        out.push({ kind: "thinking", text: part.text });
-      } else if (ptype === "toolCall" || ptype === "tool_use" || ptype === "tool_call") {
-        const name = part.name ?? part.tool ?? part.toolName ?? "tool";
-        out.push({
-          kind: "toolCall",
-          name,
-          detail: stringifyDetail(part.input ?? part.arguments),
-        });
-      } else if (typeof part?.text === "string") {
-        // fallback: parte testuale di tipo sconosciuto
-        out.push({ kind: "text", text: part.text });
+  switch (e.type) {
+    case "session": {
+      // Cattura l'id della sessione appena creata: serve al QueryPanel per i
+      // follow-up immediati (--session <id>) senza dover passare dallo storico.
+      if (typeof e.id === "string" && e.id.length > 0) {
+        out.push({ kind: "session", id: e.id });
       }
+      break;
     }
-  } else if (typeof e.text === "string") {
-    // variante top-level con campo text diretto
-    out.push({ kind: "text", text: e.text });
-  }
 
-  // Evento di risultato finale
-  if (e.type === "result" || e.result != null) {
-    const t = typeof e.result === "string" ? e.result : undefined;
-    out.push({ kind: "result", text: t });
+    case "message": {
+      // Formato file di sessione: messaggio completo con content[].
+      const content = e.message?.content;
+      if (Array.isArray(content)) out.push(...partsToEvents(content));
+      break;
+    }
+
+    case "message_update": {
+      // Stream live: delta incrementali dentro assistantMessageEvent.
+      const ame = e.assistantMessageEvent;
+      if (ame?.type === "text_delta" && typeof ame.delta === "string") {
+        out.push({ kind: "text", text: ame.delta });
+      } else if (ame?.type === "thinking_end" && typeof ame.content === "string") {
+        // Il reasoning lo emettiamo come blocco unico a fine thinking (un solo
+        // <details>), non per-delta, per non frammentare la UI.
+        out.push({ kind: "thinking", text: ame.content });
+      }
+      break;
+    }
+
+    case "tool_execution_start": {
+      if (typeof e.toolName === "string") {
+        out.push({ kind: "toolCall", name: e.toolName, detail: stringifyDetail(e.args) });
+      }
+      break;
+    }
+
+    // Tutti gli altri tipi (message_start/end, turn_*, agent_*,
+    // tool_execution_update|end, text_start/end, thinking_start, toolcall_*)
+    // sono volutamente ignorati: il testo arriva gia' completo dai delta.
   }
 
   return out;

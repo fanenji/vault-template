@@ -139,6 +139,24 @@ function stringifyDetail(value) {
     return void 0;
   }
 }
+function partsToEvents(content) {
+  const out = [];
+  for (const part of content) {
+    const ptype = part?.type;
+    if (ptype === "text" && typeof part.text === "string") {
+      out.push({ kind: "text", text: part.text });
+    } else if (ptype === "thinking" && typeof part.thinking === "string") {
+      out.push({ kind: "thinking", text: part.thinking });
+    } else if (ptype === "toolCall" || ptype === "tool_use" || ptype === "tool_call") {
+      out.push({
+        kind: "toolCall",
+        name: part.name ?? "tool",
+        detail: stringifyDetail(part.arguments ?? part.input)
+      });
+    }
+  }
+  return out;
+}
 function normalizeRawEvent(raw) {
   if (raw == null || typeof raw !== "object")
     return [];
@@ -147,31 +165,34 @@ function normalizeRawEvent(raw) {
   if (typeof e.error === "string" && e.error.length > 0) {
     out.push({ kind: "error", message: e.error });
   }
-  const content = e.message?.content;
-  if (Array.isArray(content)) {
-    for (const part of content) {
-      const ptype = part?.type;
-      if (ptype === "text" && typeof part.text === "string") {
-        out.push({ kind: "text", text: part.text });
-      } else if (ptype === "thinking" && typeof part.text === "string") {
-        out.push({ kind: "thinking", text: part.text });
-      } else if (ptype === "toolCall" || ptype === "tool_use" || ptype === "tool_call") {
-        const name = part.name ?? part.tool ?? part.toolName ?? "tool";
-        out.push({
-          kind: "toolCall",
-          name,
-          detail: stringifyDetail(part.input ?? part.arguments)
-        });
-      } else if (typeof part?.text === "string") {
-        out.push({ kind: "text", text: part.text });
+  switch (e.type) {
+    case "session": {
+      if (typeof e.id === "string" && e.id.length > 0) {
+        out.push({ kind: "session", id: e.id });
       }
+      break;
     }
-  } else if (typeof e.text === "string") {
-    out.push({ kind: "text", text: e.text });
-  }
-  if (e.type === "result" || e.result != null) {
-    const t = typeof e.result === "string" ? e.result : void 0;
-    out.push({ kind: "result", text: t });
+    case "message": {
+      const content = e.message?.content;
+      if (Array.isArray(content))
+        out.push(...partsToEvents(content));
+      break;
+    }
+    case "message_update": {
+      const ame = e.assistantMessageEvent;
+      if (ame?.type === "text_delta" && typeof ame.delta === "string") {
+        out.push({ kind: "text", text: ame.delta });
+      } else if (ame?.type === "thinking_end" && typeof ame.content === "string") {
+        out.push({ kind: "thinking", text: ame.content });
+      }
+      break;
+    }
+    case "tool_execution_start": {
+      if (typeof e.toolName === "string") {
+        out.push({ kind: "toolCall", name: e.toolName, detail: stringifyDetail(e.args) });
+      }
+      break;
+    }
   }
   return out;
 }
@@ -559,6 +580,9 @@ var StreamLog = class {
       case "exit": {
         break;
       }
+      case "session": {
+        break;
+      }
     }
     this.logEl.scrollTop = this.logEl.scrollHeight;
   }
@@ -759,6 +783,8 @@ var QueryPanel = class {
       onEvent: (ev) => {
         if (ev.kind === "exit")
           this.log.endRun(ev.code);
+        else if (ev.kind === "session")
+          this.activeSessionId = ev.id;
         else
           this.log.append(ev);
       }
