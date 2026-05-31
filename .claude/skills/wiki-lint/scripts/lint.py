@@ -246,15 +246,18 @@ def check_frontmatter(pages: list[PageData]) -> list[LintResult]:
 
 def check_missing_pages_via_qmd(
     broken_link_results: list[LintResult],
-    qmd_db: Path,
+    vault_root: Path,
     similarity_threshold: float = 0.85,
 ) -> list[LintResult]:
     """
     Per ogni broken-link, chiede a QMD se esiste una pagina semanticamente
     simile. Se sì → suggerisce di correggere il wikilink. Se no → vero
     missing-page (candidato per stub).
+
+    QMD 2.5.2 usa un indice project-local in `.qmd/` (discovery dal cwd): qui
+    eseguiamo `qmd` con cwd=vault_root e nessun flag `--db` (obsoleto).
     """
-    if not qmd_db.exists():
+    if not (vault_root / ".qmd").is_dir():
         return []
 
     results: list[LintResult] = []
@@ -270,7 +273,8 @@ def check_missing_pages_via_qmd(
 
         try:
             proc = subprocess.run(
-                ["qmd", "vsearch", link, "--db", str(qmd_db), "--json", "-n", "3"],
+                ["qmd", "vsearch", link, "--json", "-n", "3"],
+                cwd=str(vault_root),
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -394,7 +398,6 @@ def main() -> int:
 
     vault_root = args.vault.resolve() if args.vault else find_vault_root(Path.cwd())
     wiki_root = vault_root / "wiki"
-    qmd_db = vault_root / ".llm-wiki" / "qmd-index.sqlite"
 
     if not wiki_root.is_dir():
         print(f"Errore: {wiki_root} non esiste", file=sys.stderr)
@@ -413,7 +416,7 @@ def main() -> int:
 
     if args.check in ("all", "missing-page") and not args.no_qmd:
         broken = [r for r in results if r.type == "broken-link"]
-        results.extend(check_missing_pages_via_qmd(broken, qmd_db, args.similarity))
+        results.extend(check_missing_pages_via_qmd(broken, vault_root, args.similarity))
 
     # Output
     if args.json:

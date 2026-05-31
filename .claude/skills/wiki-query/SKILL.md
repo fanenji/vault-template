@@ -18,32 +18,28 @@ Cerca nella wiki via [QMD](https://github.com/tobi/qmd) e sintetizza una rispost
 ## Prerequisiti
 
 - `qmd` installato globalmente (vedi `_system/scripts/init-vault.sh`)
-- Indice QMD inizializzato in `.llm-wiki/qmd-index.sqlite`
+- Indice QMD locale `.qmd/` inizializzato (creato da `init-vault.sh` via `qmd init` + `qmd collection add ./wiki`)
 - Almeno una pagina in `wiki/`
 
-Se l'indice non esiste, suggerisci all'utente di eseguire `bash _system/scripts/init-vault.sh`.
+> **qmd 2.5.2**: l'indice è **project-local** (`.qmd/`, discovery dal cwd) — esegui sempre `qmd` dalla **vault root**. Il vecchio flag `--db .llm-wiki/qmd-index.sqlite` non esiste più (è ignorato): **non usarlo**.
+
+Se l'indice non esiste (manca `.qmd/`), suggerisci all'utente di eseguire `bash _system/scripts/init-vault.sh`.
 
 **Primo avvio — download modelli**: QMD scarica due modelli GGUF alla prima esecuzione (~400 MB totali). Se la query va in timeout con "timed out downloading a model":
-- Rilancia `qmd embed --db .llm-wiki/qmd-index.sqlite` su rete stabile, poi riprova.
+- Rilancia `qmd update && qmd embed` su rete stabile, poi riprova.
 - Come fallback immediato usa `--no-rerank` (salta il secondo modello, usa RRF score):
   ```bash
-  qmd query "<domanda>" --db "$QMD_DB" --no-rerank --json -n 8
+  qmd query "<domanda>" --no-rerank --json -n 8
   ```
 
 ## Procedura
 
 ### 1. Retrieval
 
-Determina il path del DB QMD relativo alla vault root:
+Esegui hybrid search (BM25 + vector + reranking) dalla vault root:
 
 ```bash
-QMD_DB=".llm-wiki/qmd-index.sqlite"
-```
-
-Esegui hybrid search (BM25 + vector + reranking):
-
-```bash
-qmd query "<domanda utente>" --db "$QMD_DB" --json -n 8
+qmd query "<domanda utente>" --json -n 8
 ```
 
 L'output JSON contiene `path`, `score`, `title`, `snippet` per ogni risultato. Filtra i risultati con `score < 0.3` (poco rilevanti).
@@ -57,7 +53,7 @@ L'output JSON contiene `path`, `score`, `title`, `snippet` per ogni risultato. F
 Recupera i file rilevanti in batch:
 
 ```bash
-qmd multi-get <path1> <path2> ... --db "$QMD_DB"
+qmd multi-get <path1> <path2> ...
 ```
 
 Oppure usa il tuo tool `Read` per ciascun path. Limita a 5-8 file per non saturare il context.
@@ -89,10 +85,10 @@ tags: []
 
 Nome file: kebab-case, max 50 char, suffisso data `-YYYY-MM-DD.md`. Es. `quanto-fattura-anthropic-2026-05-24.md`.
 
-Dopo il save, aggiorna l'indice QMD:
+Dopo il save, aggiorna l'indice QMD (dalla vault root):
 
 ```bash
-qmd embed --update --db "$QMD_DB"
+qmd update && qmd embed
 ```
 
 ### 5. Log
@@ -116,7 +112,7 @@ Una risposta in linguaggio naturale con:
 
 **Skill flow**:
 ```bash
-qmd query "Anthropic sicurezza AI safety" --db .llm-wiki/qmd-index.sqlite --json -n 8
+qmd query "Anthropic sicurezza AI safety" --json -n 8
 # → [{"path": "wiki/entities/anthropic.md", "score": 0.91, ...},
 #    {"path": "wiki/concepts/constitutional-ai.md", "score": 0.78, ...},
 #    {"path": "wiki/synthesis/ai-safety-landscape-2025.md", "score": 0.62, ...}]

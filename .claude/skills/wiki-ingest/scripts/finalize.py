@@ -10,7 +10,7 @@ e fa:
   4. Append a log.md
   5. Overwrite di index.md e overview.md
   6. Save cache SHA256
-  7. Aggiorna l'indice QMD (qmd embed --update)
+  7. Aggiorna l'indice QMD (qmd update && qmd embed)
 
 Stampa su stdout un riassunto JSON: { written_paths, warnings, reviews,
 merge_needed: [{path, existing, incoming}, ...] }.
@@ -152,18 +152,21 @@ def finalize(
         except Exception as e:
             warnings.append(f"Failed to save cache: {e}")
 
-    # QMD index update
+    # QMD index update (qmd 2.5.2: indice project-local .qmd/, discovery dal cwd).
+    # `qmd update` re-indicizza le collection (rileva i file nuovi/rimossi),
+    # `qmd embed` genera i vettori mancanti. cwd = vault_root → usa l'indice locale.
     if not skip_qmd_update and written_paths:
-        qmd_db = vault_root / ".llm-wiki" / "qmd-index.sqlite"
         try:
-            subprocess.run(
-                ["qmd", "embed", "--update", "--db", str(qmd_db)],
-                timeout=300,
-                check=False,
-                capture_output=True,
-            )
+            for cmd in (["qmd", "update"], ["qmd", "embed"]):
+                subprocess.run(
+                    cmd,
+                    cwd=str(vault_root),
+                    timeout=300,
+                    check=False,
+                    capture_output=True,
+                )
         except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-            warnings.append(f"QMD embed update failed: {e} (run `qmd embed --update` manually)")
+            warnings.append(f"QMD index update failed: {e} (run `qmd update && qmd embed` manually)")
 
     return {
         "written_paths": written_paths,

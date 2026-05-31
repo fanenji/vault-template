@@ -7,6 +7,9 @@
 .llm-wiki/qmd-index.sqlite-*
 .llm-wiki/*.log
 
+# Indice QMD project-local (qmd 2.5.2, rigenerabile con `qmd update && qmd embed`)
+.qmd/
+
 # Secrets locali
 .llm-wiki/secrets.json
 .env

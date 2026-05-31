@@ -60,7 +60,7 @@ Se l'utente vuole risposta veloce, salta questo step — Tavily restituisce già
 Cerca nella wiki esistente pagine semanticamente vicine al topic:
 
 ```bash
-qmd query "<topic>" --db .llm-wiki/qmd-index.sqlite --json -n 8
+qmd query "<topic>" --json -n 8   # qmd 2.5.2: indice locale .qmd/, esegui dalla vault root (no --db)
 ```
 
 Estrai `path` e `title` dei top-K. Questi diventano `{{qmd_related_pages}}` nel prompt di sintesi.
@@ -112,7 +112,7 @@ Lo script:
 ### Step 7 — Aggiorna indice QMD
 
 ```bash
-qmd embed --update --db .llm-wiki/qmd-index.sqlite
+qmd update && qmd embed
 ```
 
 Così la nuova pagina è subito search-able da `wiki-query`.
@@ -145,7 +145,7 @@ Questo trasforma una research page singola in un sottografo di entity/concept pa
 4. `qmd query "mixture of experts"` → trova `[[transformer]]`, `[[scaling-laws]]` esistenti
 5. Sintesi LLM: pagina markdown con cross-ref `[[transformer]]` e `[[scaling-laws]]`
 6. `research.py save-result` → `wiki/queries/research-mixture-of-experts-in-2026-2026-05-24.md`
-7. `qmd embed --update`
+7. `qmd update && qmd embed`
 8. (Opzionale) invoco `wiki-ingest` sulla nuova pagina → crea `wiki/concepts/mixture-of-experts.md`, `wiki/entities/<azienda-citata>.md`, ecc.
 9. Report.
 

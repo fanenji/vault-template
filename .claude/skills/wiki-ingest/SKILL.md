@@ -135,7 +135,7 @@ Output JSON con:
 - Append a `wiki/log.md`
 - Overwrite di `wiki/index.md` e `wiki/overview.md`
 - Save cache SHA256 (se nessun hard failure)
-- `qmd embed --update` (aggiorna indice)
+- `qmd update && qmd embed` (re-indicizza + embedda i nuovi file; indice locale `.qmd/` di qmd 2.5.2)
 
 ### Step 6 — Page merge LLM (se `merge_needed` non vuoto)
 
