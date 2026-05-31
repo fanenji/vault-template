@@ -43,6 +43,7 @@ var DEFAULT_SETTINGS = {
   model: "",
   defaultIngestDir: "_inbox/clippings",
   showThinking: false,
+  showToolCalls: false,
   lintScheduleEnabled: false,
   lintIntervalMinutes: 1440
 };
@@ -71,6 +72,12 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
     new import_obsidian.Setting(containerEl).setName("Mostra il thinking").setDesc("Visualizza i blocchi di ragionamento dell'agente nello stream.").addToggle(
       (t) => t.setValue(this.plugin.settings.showThinking).onChange(async (v) => {
         this.plugin.settings.showThinking = v;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Mostra i comandi eseguiti").setDesc("Visualizza le righe dei tool eseguiti dall'agente (bash, read, \u2026) nello stream. Off = log pi\xF9 pulito.").addToggle(
+      (t) => t.setValue(this.plugin.settings.showToolCalls).onChange(async (v) => {
+        this.plugin.settings.showToolCalls = v;
         await this.plugin.saveSettings();
       })
     );
@@ -500,10 +507,11 @@ var import_obsidian2 = require("obsidian");
 
 // src/view/StreamLog.ts
 var StreamLog = class {
-  constructor(parent, showThinking) {
+  constructor(parent, showThinking, showToolCalls = false) {
     this.abortController = null;
     this.currentTextEl = null;
     this.showThinking = showThinking;
+    this.showToolCalls = showToolCalls;
     this.container = parent.createDiv({ cls: "llm-wiki-stream" });
     const header = this.container.createDiv({ cls: "llm-wiki-stream-header" });
     this.statusEl = header.createSpan({ cls: "llm-wiki-stream-status", text: "Pronto" });
@@ -514,6 +522,9 @@ var StreamLog = class {
   }
   setShowThinking(value) {
     this.showThinking = value;
+  }
+  setShowToolCalls(value) {
+    this.showToolCalls = value;
   }
   // Crea un nuovo AbortController per il run corrente e abilita lo Stop.
   beginRun() {
@@ -561,6 +572,8 @@ var StreamLog = class {
       }
       case "toolCall": {
         this.currentTextEl = null;
+        if (!this.showToolCalls)
+          break;
         const row = this.logEl.createDiv({ cls: "llm-wiki-ev-tool" });
         row.createSpan({ cls: "llm-wiki-tool-name", text: `\u2699 ${ev.name}` });
         if (ev.detail)
@@ -625,7 +638,7 @@ var IngestPanel = class {
     refreshBtn.onclick = () => this.refreshFileList();
     const runBtn = controls.createEl("button", { text: "Ingerisci", cls: "mod-cta" });
     runBtn.onclick = () => this.run();
-    this.log = new StreamLog(this.root, this.getSettings().showThinking);
+    this.log = new StreamLog(this.root, this.getSettings().showThinking, this.getSettings().showToolCalls);
   }
   refreshFileList() {
     const files = this.listIngestFiles();
@@ -672,6 +685,7 @@ var IngestPanel = class {
     this.log.clear();
     const signal = this.log.beginRun();
     this.log.setShowThinking(this.getSettings().showThinking);
+    this.log.setShowToolCalls(this.getSettings().showToolCalls);
     const code = await this.runner.runSkill({
       skill: "wiki-ingest",
       prompt,
@@ -722,7 +736,7 @@ var QueryPanel = class {
     const saveLabel = saveRow.createEl("label", { cls: "llm-wiki-save-label" });
     this.saveCheckbox = saveLabel.createEl("input", { attr: { type: "checkbox" } });
     saveLabel.createSpan({ text: " Salva la risposta in wiki/queries/" });
-    this.log = new StreamLog(this.root, this.getSettings().showThinking);
+    this.log = new StreamLog(this.root, this.getSettings().showThinking, this.getSettings().showToolCalls);
     this.root.createEl("h4", { text: "Storico query" });
     this.historyEl = this.root.createDiv({ cls: "llm-wiki-history" });
     void this.refreshHistory();
@@ -754,6 +768,7 @@ var QueryPanel = class {
     try {
       const events = await this.store.loadSession(s.file);
       this.log.setShowThinking(this.getSettings().showThinking);
+      this.log.setShowToolCalls(this.getSettings().showToolCalls);
       this.log.renderHistory(events);
       new import_obsidian3.Notice("Sessione caricata \u2014 usa Follow-up per continuare");
     } catch (e) {
@@ -782,6 +797,7 @@ var QueryPanel = class {
       this.log.clear();
     const signal = this.log.beginRun();
     this.log.setShowThinking(this.getSettings().showThinking);
+    this.log.setShowToolCalls(this.getSettings().showToolCalls);
     const code = await this.runner.runSkill({
       skill: "wiki-query",
       prompt,

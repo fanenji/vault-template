@@ -7,11 +7,13 @@ export class StreamLog {
   private statusEl: HTMLElement;
   private stopBtn: HTMLButtonElement;
   private showThinking: boolean;
+  private showToolCalls: boolean;
   private abortController: AbortController | null = null;
   private currentTextEl: HTMLElement | null = null;
 
-  constructor(parent: HTMLElement, showThinking: boolean) {
+  constructor(parent: HTMLElement, showThinking: boolean, showToolCalls = false) {
     this.showThinking = showThinking;
+    this.showToolCalls = showToolCalls;
     this.container = parent.createDiv({ cls: "llm-wiki-stream" });
 
     const header = this.container.createDiv({ cls: "llm-wiki-stream-header" });
@@ -25,6 +27,10 @@ export class StreamLog {
 
   setShowThinking(value: boolean): void {
     this.showThinking = value;
+  }
+
+  setShowToolCalls(value: boolean): void {
+    this.showToolCalls = value;
   }
 
   // Crea un nuovo AbortController per il run corrente e abilita lo Stop.
@@ -76,6 +82,7 @@ export class StreamLog {
       }
       case "toolCall": {
         this.currentTextEl = null;
+        if (!this.showToolCalls) break;
         const row = this.logEl.createDiv({ cls: "llm-wiki-ev-tool" });
         row.createSpan({ cls: "llm-wiki-tool-name", text: `⚙ ${ev.name}` });
         if (ev.detail) row.createSpan({ cls: "llm-wiki-tool-detail", text: ev.detail });

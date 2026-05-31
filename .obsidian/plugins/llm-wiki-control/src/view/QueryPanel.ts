@@ -60,7 +60,7 @@ export class QueryPanel {
     this.saveCheckbox = saveLabel.createEl("input", { attr: { type: "checkbox" } });
     saveLabel.createSpan({ text: " Salva la risposta in wiki/queries/" });
 
-    this.log = new StreamLog(this.root, this.getSettings().showThinking);
+    this.log = new StreamLog(this.root, this.getSettings().showThinking, this.getSettings().showToolCalls);
 
     this.root.createEl("h4", { text: "Storico query" });
     this.historyEl = this.root.createDiv({ cls: "llm-wiki-history" });
@@ -95,6 +95,7 @@ export class QueryPanel {
     try {
       const events = await this.store.loadSession(s.file);
       this.log.setShowThinking(this.getSettings().showThinking);
+    this.log.setShowToolCalls(this.getSettings().showToolCalls);
       this.log.renderHistory(events);
       new Notice("Sessione caricata — usa Follow-up per continuare");
     } catch (e) {
@@ -127,6 +128,7 @@ export class QueryPanel {
     if (!asFollowUp) this.log.clear();
     const signal = this.log.beginRun();
     this.log.setShowThinking(this.getSettings().showThinking);
+    this.log.setShowToolCalls(this.getSettings().showToolCalls);
 
     const code = await this.runner.runSkill({
       skill: "wiki-query",

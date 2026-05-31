@@ -7,6 +7,7 @@ export interface LlmWikiSettings {
   model: string;
   defaultIngestDir: string;
   showThinking: boolean;
+  showToolCalls: boolean;
   // Predisposti per l'iterazione 2 (schedulazione lint) — non usati in v1.
   lintScheduleEnabled: boolean;
   lintIntervalMinutes: number;
@@ -18,6 +19,7 @@ export const DEFAULT_SETTINGS: LlmWikiSettings = {
   model: "",
   defaultIngestDir: "_inbox/clippings",
   showThinking: false,
+  showToolCalls: false,
   lintScheduleEnabled: false,
   lintIntervalMinutes: 1440,
 };
@@ -68,6 +70,16 @@ export class LlmWikiSettingTab extends PluginSettingTab {
       .addToggle((t) =>
         t.setValue(this.plugin.settings.showThinking).onChange(async (v) => {
           this.plugin.settings.showThinking = v;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Mostra i comandi eseguiti")
+      .setDesc("Visualizza le righe dei tool eseguiti dall'agente (bash, read, …) nello stream. Off = log più pulito.")
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.showToolCalls).onChange(async (v) => {
+          this.plugin.settings.showToolCalls = v;
           await this.plugin.saveSettings();
         })
       );

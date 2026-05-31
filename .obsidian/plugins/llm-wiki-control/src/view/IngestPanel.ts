@@ -52,7 +52,7 @@ export class IngestPanel {
     const runBtn = controls.createEl("button", { text: "Ingerisci", cls: "mod-cta" });
     runBtn.onclick = () => this.run();
 
-    this.log = new StreamLog(this.root, this.getSettings().showThinking);
+    this.log = new StreamLog(this.root, this.getSettings().showThinking, this.getSettings().showToolCalls);
   }
 
   private refreshFileList(): void {
@@ -106,6 +106,7 @@ export class IngestPanel {
     this.log.clear();
     const signal = this.log.beginRun();
     this.log.setShowThinking(this.getSettings().showThinking);
+    this.log.setShowToolCalls(this.getSettings().showToolCalls);
 
     const code = await this.runner.runSkill({
       skill: "wiki-ingest",
