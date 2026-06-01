@@ -33,6 +33,44 @@ export class LlmWikiSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
+  // ── TAVILY_API_KEY: proxy verso .llm-wiki/secrets.json ──────────────────────
+  // La source of truth è il file (letto da deep-research/web_search.py): NON
+  // salviamo il segreto nei dati del plugin. Accesso via vault adapter (path
+  // relativi alla vault root, dotfolder inclusi).
+  private static readonly SECRETS_DIR = ".llm-wiki";
+  private static readonly SECRETS_PATH = ".llm-wiki/secrets.json";
+
+  private async readTavilyKey(): Promise<string> {
+    try {
+      const adapter = this.app.vault.adapter;
+      if (!(await adapter.exists(LlmWikiSettingTab.SECRETS_PATH))) return "";
+      const data = JSON.parse(await adapter.read(LlmWikiSettingTab.SECRETS_PATH));
+      const k = data?.TAVILY_API_KEY;
+      return typeof k === "string" ? k : "";
+    } catch {
+      return "";
+    }
+  }
+
+  private async writeTavilyKey(value: string): Promise<void> {
+    const adapter = this.app.vault.adapter;
+    let data: Record<string, unknown> = {};
+    try {
+      if (await adapter.exists(LlmWikiSettingTab.SECRETS_PATH)) {
+        const parsed = JSON.parse(await adapter.read(LlmWikiSettingTab.SECRETS_PATH));
+        if (parsed && typeof parsed === "object") data = parsed as Record<string, unknown>;
+      }
+    } catch {
+      data = {}; // JSON corrotto: riparte da oggetto vuoto (sovrascrive)
+    }
+    if (value) data.TAVILY_API_KEY = value;
+    else delete data.TAVILY_API_KEY; // campo svuotato → rimuove la chiave
+    if (!(await adapter.exists(LlmWikiSettingTab.SECRETS_DIR))) {
+      await adapter.mkdir(LlmWikiSettingTab.SECRETS_DIR);
+    }
+    await adapter.write(LlmWikiSettingTab.SECRETS_PATH, JSON.stringify(data, null, 2) + "\n");
+  }
+
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
@@ -83,6 +121,29 @@ export class LlmWikiSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         })
       );
+
+    // Tavily API key — proxy verso .llm-wiki/secrets.json (vedi helper sopra).
+    // Persistita su `blur` per evitare scritture/JSON corrotti per-keystroke.
+    new Setting(containerEl)
+      .setName("Tavily API key")
+      .setDesc(
+        "Per deep-research (fallback automatico a DuckDuckGo se vuota). Salvata in " +
+          ".llm-wiki/secrets.json (non committato). La env var TAVILY_API_KEY, se presente, ha la precedenza."
+      )
+      .addText((t) => {
+        t.setPlaceholder("tvly-…");
+        t.inputEl.type = "password";
+        void (async () => {
+          t.setValue(await this.readTavilyKey());
+        })();
+        t.inputEl.addEventListener("blur", () => {
+          void (async () => {
+            await this.writeTavilyKey(t.getValue().trim());
+            new Notice("Tavily API key salvata in .llm-wiki/secrets.json");
+          })();
+        });
+        return t;
+      });
 
     // Provider / Model con dropdown popolato da `pi --list-models`.
     const providerSetting = new Setting(containerEl)

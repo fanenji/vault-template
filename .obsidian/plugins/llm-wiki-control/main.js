@@ -47,11 +47,44 @@ var DEFAULT_SETTINGS = {
   lintScheduleEnabled: false,
   lintIntervalMinutes: 1440
 };
-var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
+var _LlmWikiSettingTab = class _LlmWikiSettingTab extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.models = [];
     this.plugin = plugin;
+  }
+  async readTavilyKey() {
+    try {
+      const adapter = this.app.vault.adapter;
+      if (!await adapter.exists(_LlmWikiSettingTab.SECRETS_PATH))
+        return "";
+      const data = JSON.parse(await adapter.read(_LlmWikiSettingTab.SECRETS_PATH));
+      const k = data?.TAVILY_API_KEY;
+      return typeof k === "string" ? k : "";
+    } catch {
+      return "";
+    }
+  }
+  async writeTavilyKey(value) {
+    const adapter = this.app.vault.adapter;
+    let data = {};
+    try {
+      if (await adapter.exists(_LlmWikiSettingTab.SECRETS_PATH)) {
+        const parsed = JSON.parse(await adapter.read(_LlmWikiSettingTab.SECRETS_PATH));
+        if (parsed && typeof parsed === "object")
+          data = parsed;
+      }
+    } catch {
+      data = {};
+    }
+    if (value)
+      data.TAVILY_API_KEY = value;
+    else
+      delete data.TAVILY_API_KEY;
+    if (!await adapter.exists(_LlmWikiSettingTab.SECRETS_DIR)) {
+      await adapter.mkdir(_LlmWikiSettingTab.SECRETS_DIR);
+    }
+    await adapter.write(_LlmWikiSettingTab.SECRETS_PATH, JSON.stringify(data, null, 2) + "\n");
   }
   display() {
     const { containerEl } = this;
@@ -81,6 +114,22 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
+    new import_obsidian.Setting(containerEl).setName("Tavily API key").setDesc(
+      "Per deep-research (fallback automatico a DuckDuckGo se vuota). Salvata in .llm-wiki/secrets.json (non committato). La env var TAVILY_API_KEY, se presente, ha la precedenza."
+    ).addText((t) => {
+      t.setPlaceholder("tvly-\u2026");
+      t.inputEl.type = "password";
+      void (async () => {
+        t.setValue(await this.readTavilyKey());
+      })();
+      t.inputEl.addEventListener("blur", () => {
+        void (async () => {
+          await this.writeTavilyKey(t.getValue().trim());
+          new import_obsidian.Notice("Tavily API key salvata in .llm-wiki/secrets.json");
+        })();
+      });
+      return t;
+    });
     const providerSetting = new import_obsidian.Setting(containerEl).setName("Provider").setDesc("Lasciare vuoto per il default di pi.").addText(
       (t) => t.setValue(this.plugin.settings.provider).onChange(async (v) => {
         this.plugin.settings.provider = v.trim();
@@ -127,6 +176,13 @@ var LlmWikiSettingTab = class extends import_obsidian.PluginSettingTab {
     );
   }
 };
+// ── TAVILY_API_KEY: proxy verso .llm-wiki/secrets.json ──────────────────────
+// La source of truth è il file (letto da deep-research/web_search.py): NON
+// salviamo il segreto nei dati del plugin. Accesso via vault adapter (path
+// relativi alla vault root, dotfolder inclusi).
+_LlmWikiSettingTab.SECRETS_DIR = ".llm-wiki";
+_LlmWikiSettingTab.SECRETS_PATH = ".llm-wiki/secrets.json";
+var LlmWikiSettingTab = _LlmWikiSettingTab;
 
 // src/runner/piRunner.ts
 var import_child_process = require("child_process");
