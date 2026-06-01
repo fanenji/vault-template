@@ -2,10 +2,11 @@ import { ItemView, WorkspaceLeaf } from "obsidian";
 import type LlmWikiControlPlugin from "../main";
 import { IngestPanel } from "./IngestPanel";
 import { QueryPanel } from "./QueryPanel";
+import { ResearchPanel } from "./ResearchPanel";
 
 export const VIEW_TYPE_LLM_WIKI = "llm-wiki-control";
 
-type TabId = "ingest" | "query";
+type TabId = "ingest" | "query" | "research";
 
 export class ControlView extends ItemView {
   private plugin: LlmWikiControlPlugin;
@@ -48,11 +49,19 @@ export class ControlView extends ItemView {
     };
 
     const queryPane = makeTab("query", "Query");
+    const researchPane = makeTab("research", "DeepResearch");
     const ingestPane = makeTab("ingest", "Ingest");
 
-    // Istanzia i panel (Query include il proprio storico).
+    // Istanzia i panel (Query/DeepResearch includono il proprio storico).
     new QueryPanel(
       queryPane,
+      this.app,
+      this.plugin.runner,
+      this.plugin.sessionStore,
+      () => this.plugin.settings
+    );
+    new ResearchPanel(
+      researchPane,
       this.app,
       this.plugin.runner,
       this.plugin.sessionStore,

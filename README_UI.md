@@ -42,6 +42,15 @@ Conseguenze architetturali:
 - **Checkbox "Salva la risposta in wiki/queries/"** (default off): se attiva,
   istruisce la skill a salvare la risposta come pagina e a reindicizzare QMD.
 
+### Tab DeepResearch
+- Casella argomento → esegue `deep-research` (ricerca web multi-query con Tavily,
+  fallback automatico a DuckDuckGo).
+- **Streaming live** della sintesi con citazioni `[[wikilink]]` + cross-reference
+  alle pagine wiki esistenti; salva una pagina in `wiki/queries/research-…md`.
+- **Storico ricerche** con resume/Follow-up (come Query).
+- **Toggle "Auto-ingest"** (default off): se attivo, scompone la pagina di
+  ricerca in pagine entity/concept collegate (Step 8 della skill).
+
 ### Tab Ingest
 - Selettore **file singolo** o **intera cartella** (default `_inbox/clippings`,
   configurabile).
@@ -62,12 +71,14 @@ Conseguenze architetturali:
 - `Percorso di pi` (comando o path assoluto).
 - `Provider` / `Model` (dropdown popolato da `pi --list-models`).
 - `Cartella ingest predefinita`.
+- `Tavily API key` (input password): proxy a `.llm-wiki/secrets.json`, usato da
+  `deep-research`. Salvato su blur, non nei dati del plugin; la env var
+  `TAVILY_API_KEY` ha la precedenza.
 - `Mostra il thinking` (default off).
 - `Mostra i comandi eseguiti` (default off).
 - Predisposti (iterazione 2, non attivi): schedulazione `wiki-lint`.
 
-### Roadmap (predisposto, non in v1)
-- Tab **DeepResearch** (skill `deep-research`).
+### Roadmap (predisposto, non ancora implementato)
 - Tab **Lint** con checkbox `--fix` (skill `wiki-lint`).
 - **Schedulazione** automatica del lint.
 
