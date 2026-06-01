@@ -3,10 +3,11 @@ import type LlmWikiControlPlugin from "../main";
 import { IngestPanel } from "./IngestPanel";
 import { QueryPanel } from "./QueryPanel";
 import { ResearchPanel } from "./ResearchPanel";
+import { LintPanel } from "./LintPanel";
 
 export const VIEW_TYPE_LLM_WIKI = "llm-wiki-control";
 
-type TabId = "ingest" | "query" | "research";
+type TabId = "ingest" | "query" | "research" | "lint";
 
 export class ControlView extends ItemView {
   private plugin: LlmWikiControlPlugin;
@@ -51,6 +52,7 @@ export class ControlView extends ItemView {
     const queryPane = makeTab("query", "Query");
     const researchPane = makeTab("research", "DeepResearch");
     const ingestPane = makeTab("ingest", "Ingest");
+    const lintPane = makeTab("lint", "Lint");
 
     // Istanzia i panel (Query/DeepResearch includono il proprio storico).
     new QueryPanel(
@@ -68,6 +70,7 @@ export class ControlView extends ItemView {
       () => this.plugin.settings
     );
     new IngestPanel(ingestPane, this.app, this.plugin.runner, () => this.plugin.settings);
+    new LintPanel(lintPane, this.plugin.runner, () => this.plugin.settings);
 
     this.selectTab(this.active);
   }

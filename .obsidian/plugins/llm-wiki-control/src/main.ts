@@ -12,6 +12,8 @@ export default class LlmWikiControlPlugin extends Plugin {
   settings!: LlmWikiSettings;
   runner!: PiRunner;
   sessionStore!: SessionStore;
+  private lintIntervalId: number | null = null;
+  private scheduledLintRunning = false;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -19,6 +21,8 @@ export default class LlmWikiControlPlugin extends Plugin {
     const vaultRoot = this.getVaultRoot();
     this.runner = new PiRunner(vaultRoot, this.settings);
     this.sessionStore = new SessionStore(vaultRoot);
+
+    this.setupLintSchedule();
 
     this.registerView(
       VIEW_TYPE_LLM_WIKI,
@@ -73,5 +77,45 @@ export default class LlmWikiControlPlugin extends Plugin {
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
     if (this.runner) this.runner.updateSettings(this.settings);
+  }
+
+  // (Ri)configura la schedulazione del lint in base ai settings. Chiamato a
+  // onload e dai toggle/intervallo nel SettingTab.
+  setupLintSchedule(): void {
+    if (this.lintIntervalId !== null) {
+      window.clearInterval(this.lintIntervalId);
+      this.lintIntervalId = null;
+    }
+    if (!this.settings.lintScheduleEnabled) return;
+    const minutes = Math.max(5, this.settings.lintIntervalMinutes || 1440);
+    this.lintIntervalId = window.setInterval(
+      () => void this.runScheduledLint(),
+      minutes * 60_000
+    );
+    // Cleanup automatico allo unload del plugin.
+    this.registerInterval(this.lintIntervalId);
+  }
+
+  // Esegue wiki-lint in background (no --fix), salva il report e notifica.
+  private async runScheduledLint(): Promise<void> {
+    if (this.scheduledLintRunning || !this.runner) return;
+    this.scheduledLintRunning = true;
+    new Notice("LLM Wiki: avvio lint schedulato…");
+    try {
+      await this.runner.runSkill({
+        skill: "wiki-lint",
+        prompt:
+          "[llm-wiki:lint] Esegui un audit della wiki con wiki-lint in modalità " +
+          "non interattiva (senza --fix). Salva il report in wiki/lint-report.md.",
+        onEvent: () => {
+          /* run in background: nessun rendering */
+        },
+      });
+      new Notice("LLM Wiki: lint schedulato completato (wiki/lint-report.md).");
+    } catch (e) {
+      new Notice(`LLM Wiki: lint schedulato fallito — ${String(e)}`);
+    } finally {
+      this.scheduledLintRunning = false;
+    }
   }
 }

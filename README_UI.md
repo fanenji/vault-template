@@ -59,6 +59,12 @@ Conseguenze architetturali:
 - A fine ingest riuscito il **sorgente viene archiviato** automaticamente in
   `raw/sources/` (vedi §3).
 
+### Tab Lint
+- Esegue `wiki-lint` (audit: link rotti, orfani, frontmatter, problemi semantici).
+- **Checkbox `--fix`** (default off): applica le correzioni automatiche
+  (frontmatter mancanti, stub missing-page).
+- Streaming live; il report completo è salvato in `wiki/lint-report.md`.
+
 ### Streaming / log
 - Parser eventi allineato allo schema reale di `pi --mode json` (v0.78):
   `message_update.assistantMessageEvent.text_delta` per il testo,
@@ -76,11 +82,9 @@ Conseguenze architetturali:
   `TAVILY_API_KEY` ha la precedenza.
 - `Mostra il thinking` (default off).
 - `Mostra i comandi eseguiti` (default off).
-- Predisposti (iterazione 2, non attivi): schedulazione `wiki-lint`.
-
-### Roadmap (predisposto, non ancora implementato)
-- Tab **Lint** con checkbox `--fix` (skill `wiki-lint`).
-- **Schedulazione** automatica del lint.
+- **Schedulazione lint**: toggle `Lint automatico` + `Intervallo (minuti)`
+  (default 1440, minimo 5): esegue periodicamente `wiki-lint` in background
+  (senza `--fix`) e salva `wiki/lint-report.md`, con notifica a fine run.
 
 ---
 
