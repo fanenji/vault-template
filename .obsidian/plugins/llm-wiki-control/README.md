@@ -27,6 +27,25 @@ npm run build      # tsc -noEmit + esbuild → main.js
 
 `main.js` è committato, quindi sul Mac basta abilitare il plugin (non serve build).
 
+## Installare/aggiornare su altre vault
+
+Le vault **nuove** nascono da vault-template (copia/clone): già complete.
+
+Per le vault **esistenti** (che hanno già llm-wiki in versione pre-plugin) usa lo
+script idempotente, lanciato **da vault-template**:
+
+```bash
+bash _system/scripts/install-into-vault.sh /path/to/vault [--dry-run]
+```
+
+Aggiorna la machinery (skill, script, plugin) + migra l'indice a qmd 2.5.2
+(`.qmd/`), **preservando** i contenuti per-vault (`purpose.md`, `schema.md`, note,
+`wiki/`). `CLAUDE.md`/`AGENTS.md` vengono aggiornati con backup `.bak`. La
+machinery sostituita è salvata in `.llm-wiki/backups/<timestamp>/` se la vault
+non è un repo git. È idempotente: rilanciabile come updater. Usa `--dry-run` per
+vedere prima cosa cambierebbe. Dopo: ricarica Obsidian e abilita il plugin
+("Fidati dell'autore" alla prima installazione).
+
 ## Verifica runtime (sul Mac, dove `pi` è installato)
 
 1. **Schema eventi** — ✅ confermato su `pi v0.78`. Lo stream live usa delta
