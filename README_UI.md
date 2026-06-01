@@ -71,6 +71,9 @@ Conseguenze architetturali:
 - `Percorso di pi` (comando o path assoluto).
 - `Provider` / `Model` (dropdown popolato da `pi --list-models`).
 - `Cartella ingest predefinita`.
+- `Tavily API key` (input password): proxy a `.llm-wiki/secrets.json`, usato da
+  `deep-research`. Salvato su blur, non nei dati del plugin; la env var
+  `TAVILY_API_KEY` ha la precedenza.
 - `Mostra il thinking` (default off).
 - `Mostra i comandi eseguiti` (default off).
 - Predisposti (iterazione 2, non attivi): schedulazione `wiki-lint`.

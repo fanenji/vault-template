@@ -6,17 +6,21 @@ Non reimplementa la logica delle skill: **pilota l'agente `pi` in headless**
 
 Plugin **desktop-only** (usa `child_process` per lanciare `pi`).
 
-## Cosa fa (v1 / MVP)
+## Cosa fa
 
 - Icona ribbon + comando "Apri pannello LLM Wiki" → pannello laterale (`ItemView`).
 - Tab **Query**: domanda → `wiki-query`, streaming live, storico delle query con
-  click → resume e Follow-up (continua la sessione via `--session <id>`).
+  click → resume e Follow-up (continua la sessione via `--session <id>`); checkbox
+  per salvare la risposta in `wiki/queries/`.
+- Tab **DeepResearch**: argomento → `deep-research` (Tavily/DuckDuckGo), streaming
+  con `[[wikilink]]` + cross-ref, storico, toggle **Auto-ingest** (Step 8).
 - Tab **Ingest**: seleziona un file (o l'intera cartella `_inbox/clippings`) →
   `wiki-ingest`. Avviso costo token per batch > 5 file (regola di `CLAUDE.md`).
 - Settings: percorso di `pi`, provider/model (dropdown da `pi --list-models`),
-  cartella ingest, toggle "mostra thinking".
+  cartella ingest, **Tavily API key** (→ `.llm-wiki/secrets.json`), toggle
+  "mostra thinking" e "mostra i comandi eseguiti".
 
-DeepResearch, Lint `--fix` e schedulazione sono predisposti ma fuori scope v1.
+Lint `--fix` e schedulazione sono predisposti ma non ancora implementati.
 
 ## Build
 
