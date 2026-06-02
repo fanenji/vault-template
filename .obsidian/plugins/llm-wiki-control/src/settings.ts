@@ -205,5 +205,38 @@ export class LlmWikiSettingTab extends PluginSettingTab {
           }
         })
       );
+
+    // ── Schedulazione lint ──────────────────────────────────────────────────
+    new Setting(containerEl).setName("Schedulazione lint").setHeading();
+
+    new Setting(containerEl)
+      .setName("Lint automatico")
+      .setDesc(
+        "Esegui periodicamente wiki-lint in background (senza --fix) e salva il " +
+          "report in wiki/lint-report.md."
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.lintScheduleEnabled).onChange(async (v) => {
+          this.plugin.settings.lintScheduleEnabled = v;
+          await this.plugin.saveSettings();
+          this.plugin.setupLintSchedule();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Intervallo (minuti)")
+      .setDesc("Minimo 5. Default 1440 (giornaliero).")
+      .addText((t) =>
+        t
+          .setValue(String(this.plugin.settings.lintIntervalMinutes))
+          .onChange(async (v) => {
+            const n = parseInt(v, 10);
+            if (!Number.isNaN(n) && n > 0) {
+              this.plugin.settings.lintIntervalMinutes = n;
+              await this.plugin.saveSettings();
+              this.plugin.setupLintSchedule();
+            }
+          })
+      );
   }
 }

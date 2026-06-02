@@ -33,7 +33,7 @@ __export(main_exports, {
   default: () => LlmWikiControlPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian6 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 
 // src/settings.ts
 var import_obsidian = require("obsidian");
@@ -171,6 +171,26 @@ var _LlmWikiSettingTab = class _LlmWikiSettingTab extends import_obsidian.Plugin
           new import_obsidian.Notice(`Errore list-models: ${String(e)}`);
         } finally {
           b.setDisabled(false).setButtonText("Ricarica modelli");
+        }
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Schedulazione lint").setHeading();
+    new import_obsidian.Setting(containerEl).setName("Lint automatico").setDesc(
+      "Esegui periodicamente wiki-lint in background (senza --fix) e salva il report in wiki/lint-report.md."
+    ).addToggle(
+      (t) => t.setValue(this.plugin.settings.lintScheduleEnabled).onChange(async (v) => {
+        this.plugin.settings.lintScheduleEnabled = v;
+        await this.plugin.saveSettings();
+        this.plugin.setupLintSchedule();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Intervallo (minuti)").setDesc("Minimo 5. Default 1440 (giornaliero).").addText(
+      (t) => t.setValue(String(this.plugin.settings.lintIntervalMinutes)).onChange(async (v) => {
+        const n = parseInt(v, 10);
+        if (!Number.isNaN(n) && n > 0) {
+          this.plugin.settings.lintIntervalMinutes = n;
+          await this.plugin.saveSettings();
+          this.plugin.setupLintSchedule();
         }
       })
     );
@@ -556,7 +576,7 @@ var SessionStore = class {
 };
 
 // src/view/ControlView.ts
-var import_obsidian5 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 
 // src/view/IngestPanel.ts
 var import_obsidian2 = require("obsidian");
@@ -992,9 +1012,61 @@ var ResearchPanel = class {
   }
 };
 
+// src/view/LintPanel.ts
+var import_obsidian5 = require("obsidian");
+var LintPanel = class {
+  constructor(parent, runner, getSettings) {
+    this.running = false;
+    this.runner = runner;
+    this.getSettings = getSettings;
+    this.root = parent.createDiv({ cls: "llm-wiki-panel" });
+    this.build();
+  }
+  build() {
+    this.root.createEl("p", {
+      cls: "llm-wiki-hint",
+      text: "Audit della wiki: link rotti, pagine orfane, frontmatter, e problemi semantici (contraddizioni, stale, missing-page)."
+    });
+    const fixRow = this.root.createDiv({ cls: "llm-wiki-save-row" });
+    const fixLabel = fixRow.createEl("label", { cls: "llm-wiki-save-label" });
+    this.fixCheckbox = fixLabel.createEl("input", { attr: { type: "checkbox" } });
+    fixLabel.createSpan({ text: " --fix (applica correzioni: frontmatter mancanti, stub missing-page)" });
+    const controls = this.root.createDiv({ cls: "llm-wiki-controls" });
+    const runBtn = controls.createEl("button", { text: "Esegui audit", cls: "mod-cta" });
+    runBtn.onclick = () => this.run();
+    this.log = new StreamLog(this.root, this.getSettings().showThinking, this.getSettings().showToolCalls);
+  }
+  async run() {
+    if (this.running) {
+      new import_obsidian5.Notice("Audit gia' in corso");
+      return;
+    }
+    const fix = this.fixCheckbox.checked;
+    const prompt = "[llm-wiki:lint] Esegui un audit completo della wiki con la skill wiki-lint" + (fix ? " e applica le correzioni automatiche (--fix: frontmatter mancanti, stub missing-page)." : " (sola analisi, senza --fix).") + " Salva il report in wiki/lint-report.md.";
+    this.running = true;
+    this.log.clear();
+    const signal = this.log.beginRun();
+    this.log.setShowThinking(this.getSettings().showThinking);
+    this.log.setShowToolCalls(this.getSettings().showToolCalls);
+    const code = await this.runner.runSkill({
+      skill: "wiki-lint",
+      prompt,
+      signal,
+      onEvent: (ev) => {
+        if (ev.kind === "exit")
+          this.log.endRun(ev.code);
+        else if (ev.kind !== "session")
+          this.log.append(ev);
+      }
+    });
+    this.log.endRun(code);
+    this.running = false;
+  }
+};
+
 // src/view/ControlView.ts
 var VIEW_TYPE_LLM_WIKI = "llm-wiki-control";
-var ControlView = class extends import_obsidian5.ItemView {
+var ControlView = class extends import_obsidian6.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.tabButtons = /* @__PURE__ */ new Map();
@@ -1028,6 +1100,7 @@ var ControlView = class extends import_obsidian5.ItemView {
     const queryPane = makeTab("query", "Query");
     const researchPane = makeTab("research", "DeepResearch");
     const ingestPane = makeTab("ingest", "Ingest");
+    const lintPane = makeTab("lint", "Lint");
     new QueryPanel(
       queryPane,
       this.app,
@@ -1043,6 +1116,7 @@ var ControlView = class extends import_obsidian5.ItemView {
       () => this.plugin.settings
     );
     new IngestPanel(ingestPane, this.app, this.plugin.runner, () => this.plugin.settings);
+    new LintPanel(lintPane, this.plugin.runner, () => this.plugin.settings);
     this.selectTab(this.active);
   }
   selectTab(id) {
@@ -1060,12 +1134,18 @@ var ControlView = class extends import_obsidian5.ItemView {
 };
 
 // src/main.ts
-var LlmWikiControlPlugin = class extends import_obsidian6.Plugin {
+var LlmWikiControlPlugin = class extends import_obsidian7.Plugin {
+  constructor() {
+    super(...arguments);
+    this.lintIntervalId = null;
+    this.scheduledLintRunning = false;
+  }
   async onload() {
     await this.loadSettings();
     const vaultRoot = this.getVaultRoot();
     this.runner = new PiRunner(vaultRoot, this.settings);
     this.sessionStore = new SessionStore(vaultRoot);
+    this.setupLintSchedule();
     this.registerView(
       VIEW_TYPE_LLM_WIKI,
       (leaf) => new ControlView(leaf, this)
@@ -1084,10 +1164,10 @@ var LlmWikiControlPlugin = class extends import_obsidian6.Plugin {
   }
   getVaultRoot() {
     const adapter = this.app.vault.adapter;
-    if (adapter instanceof import_obsidian6.FileSystemAdapter) {
+    if (adapter instanceof import_obsidian7.FileSystemAdapter) {
       return adapter.getBasePath();
     }
-    new import_obsidian6.Notice("LLM Wiki Control richiede un vault su filesystem (desktop).");
+    new import_obsidian7.Notice("LLM Wiki Control richiede un vault su filesystem (desktop).");
     return "";
   }
   async activateView() {
@@ -1111,5 +1191,41 @@ var LlmWikiControlPlugin = class extends import_obsidian6.Plugin {
     await this.saveData(this.settings);
     if (this.runner)
       this.runner.updateSettings(this.settings);
+  }
+  // (Ri)configura la schedulazione del lint in base ai settings. Chiamato a
+  // onload e dai toggle/intervallo nel SettingTab.
+  setupLintSchedule() {
+    if (this.lintIntervalId !== null) {
+      window.clearInterval(this.lintIntervalId);
+      this.lintIntervalId = null;
+    }
+    if (!this.settings.lintScheduleEnabled)
+      return;
+    const minutes = Math.max(5, this.settings.lintIntervalMinutes || 1440);
+    this.lintIntervalId = window.setInterval(
+      () => void this.runScheduledLint(),
+      minutes * 6e4
+    );
+    this.registerInterval(this.lintIntervalId);
+  }
+  // Esegue wiki-lint in background (no --fix), salva il report e notifica.
+  async runScheduledLint() {
+    if (this.scheduledLintRunning || !this.runner)
+      return;
+    this.scheduledLintRunning = true;
+    new import_obsidian7.Notice("LLM Wiki: avvio lint schedulato\u2026");
+    try {
+      await this.runner.runSkill({
+        skill: "wiki-lint",
+        prompt: "[llm-wiki:lint] Esegui un audit della wiki con wiki-lint in modalit\xE0 non interattiva (senza --fix). Salva il report in wiki/lint-report.md.",
+        onEvent: () => {
+        }
+      });
+      new import_obsidian7.Notice("LLM Wiki: lint schedulato completato (wiki/lint-report.md).");
+    } catch (e) {
+      new import_obsidian7.Notice(`LLM Wiki: lint schedulato fallito \u2014 ${String(e)}`);
+    } finally {
+      this.scheduledLintRunning = false;
+    }
   }
 };
