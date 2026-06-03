@@ -1,5 +1,5 @@
 {
-  "folder": "_inbox/Journal",
+  "folder": "_inbox/journal",
   "template": "_system/templates/Journal Template",
   "format": "YYYY-MM-DD HHmm"
 }

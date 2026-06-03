@@ -1,16 +1,24 @@
 {
   "recentFiles": [
     {
+      "basename": "README_UI",
+      "path": "README_UI.md"
+    },
+    {
+      "basename": "README",
+      "path": "README.md"
+    },
+    {
+      "basename": "UltraPlan",
+      "path": "UltraPlan.md"
+    },
+    {
       "basename": "01.todo",
       "path": "_notes/01.todo/01.todo.md"
     },
     {
       "basename": "llm-wiki",
       "path": "_notes/02.notes/llm-wiki/llm-wiki.md"
-    },
-    {
-      "basename": "README",
-      "path": "README.md"
     },
     {
       "basename": "comparisons 2",

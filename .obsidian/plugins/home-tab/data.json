@@ -24,8 +24,12 @@
   "unresolvedLinks": false,
   "recentFilesStore": [
     {
-      "filepath": "_notes/01.todo/01.todo.md",
-      "timestamp": 1780146827949
+      "filepath": "README_UI.md",
+      "timestamp": 1780388422652
+    },
+    {
+      "filepath": "README.md",
+      "timestamp": 1780382626762
     }
   ],
   "bookmarkedFileStore": [],

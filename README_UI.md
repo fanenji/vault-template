@@ -122,6 +122,14 @@ bash _system/scripts/install-into-vault.sh /path/to/vault            # applica
 bash _system/scripts/install-into-vault.sh /path/to/vault --dry-run  # anteprima
 ```
 
+``` bash
+cd /Users/S.Parodi/Vaults/vault-template
+
+./_system/scripts/install-into-vault.sh ../vault
+./_system/scripts/install-into-vault.sh ../data-platform
+./_system/scripts/install-into-vault.sh ../open-metadata
+```
+
 ### Cosa fa
 
 | Componente | Azione |
