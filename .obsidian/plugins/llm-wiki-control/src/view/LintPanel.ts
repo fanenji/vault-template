@@ -49,7 +49,7 @@ export class LintPanel {
       (fix
         ? " e applica le correzioni automatiche (--fix: frontmatter mancanti, stub missing-page)."
         : " (sola analisi, senza --fix).") +
-      " Salva il report in wiki/lint-report.md.";
+      " Salva il report in _notes/lint/lint-report.md.";
 
     this.running = true;
     this.log.clear();

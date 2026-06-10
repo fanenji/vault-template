@@ -106,12 +106,12 @@ export default class LlmWikiControlPlugin extends Plugin {
         skill: "wiki-lint",
         prompt:
           "[llm-wiki:lint] Esegui un audit della wiki con wiki-lint in modalità " +
-          "non interattiva (senza --fix). Salva il report in wiki/lint-report.md.",
+          "non interattiva (senza --fix). Salva il report in _notes/lint/lint-report.md.",
         onEvent: () => {
           /* run in background: nessun rendering */
         },
       });
-      new Notice("LLM Wiki: lint schedulato completato (wiki/lint-report.md).");
+      new Notice("LLM Wiki: lint schedulato completato (_notes/lint/lint-report.md).");
     } catch (e) {
       new Notice(`LLM Wiki: lint schedulato fallito — ${String(e)}`);
     } finally {

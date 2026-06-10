@@ -12,6 +12,8 @@ L'indice di ricerca QMD **non** vive qui: è project-local in `.qmd/` alla vault
 | `ingest-cache.json` | Cache SHA256 per file sorgente: skip su file invariati |
 | `pending-merges.json` | Pagine in attesa di body merge LLM (Step 6 di wiki-ingest). Contiene il body esistente pre-overwrite |
 | `review/items.json` | REVIEW blocks emessi dall'ingest che richiedono decisione umana |
+| `lint/history/<ts>.json` | Storico dei run di wiki-lint (ultimi 30) — usato per il diff nuove/risolte |
+| `lint/last-sampled.json` | Rotazione del campione per il check semantico (Step 2 di wiki-lint) |
 | `config.json` | Config locale della vault (override del template) |
 | `secrets.json` | Chiavi API (Tavily, ecc.) — **mai committare** |
 
@@ -34,6 +36,8 @@ Copia `config.example.json` in `config.json` e modifica i valori. Chiavi effetti
 | `deep_research.max_queries` | agente (Step 1 di deep-research) | 3 |
 | `deep_research.max_results_per_query` | `web_search.py`, `research.py` | 5 |
 | `lint.semantic_similarity_threshold` | `lint.py` (check missing-page) | 0.85 |
+| `lint.pair_similarity_threshold` | `lint.py` (check similar-pairs) | 0.90 |
+| `lint.pending_max_age_days` | `lint.py` (check pending: warning oltre la soglia) | 7 |
 
 I flag CLI hanno sempre precedenza sul config. Per i secrets la cascata è: variabili ambiente (es. `TAVILY_API_KEY`) → `.llm-wiki/secrets.json`.
 
@@ -42,7 +46,7 @@ I flag CLI hanno sempre precedenza sul config. Per i secrets la cascata è: vari
 Per resettare completamente lo stato (mantenendo `wiki/` e `raw/`):
 
 ```bash
-rm -rf .llm-wiki/queue .llm-wiki/ingest-cache.json .llm-wiki/pending-merges.json .llm-wiki/review
+rm -rf .llm-wiki/queue .llm-wiki/ingest-cache.json .llm-wiki/pending-merges.json .llm-wiki/review .llm-wiki/lint
 rm -rf .qmd && qmd init && qmd collection add ./wiki && qmd update && qmd embed
 ```
 

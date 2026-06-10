@@ -3,6 +3,7 @@
 .llm-wiki/ingest-cache.json
 .llm-wiki/pending-merges.json
 .llm-wiki/review/
+.llm-wiki/lint/
 .llm-wiki/*.log
 
 # Indice QMD project-local (qmd 2.5.2, rigenerabile con `qmd update && qmd embed`)

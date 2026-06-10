@@ -7,6 +7,8 @@
     "max_results_per_query": 5
   },
   "lint": {
-    "semantic_similarity_threshold": 0.85
+    "semantic_similarity_threshold": 0.85,
+    "pair_similarity_threshold": 0.9,
+    "pending_max_age_days": 7
   }
 }

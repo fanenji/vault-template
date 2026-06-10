@@ -47,7 +47,7 @@ Poi processa uno per volta:
 ```bash
 ITEM=$(python .claude/skills/wiki-ingest/scripts/queue.py next)
 # ITEM è JSON: { id, source_path, status, ... }
-# segui Step 1-7 sotto, poi:
+# segui Step 1-8 sotto, poi:
 python .claude/skills/wiki-ingest/scripts/queue.py mark <id> done
 # o se fallisce:
 python .claude/skills/wiki-ingest/scripts/queue.py mark <id> failed --error "..."
@@ -167,11 +167,21 @@ write_file(rel_path, final)
 
 (Se devi rimandare lo Step 6, le pagine restano con array-union + new body — coerenti, ma il body precedente è solo nella coda pending. Segnalalo all'utente e NON cancellare `pending-merges.json`.)
 
-### Step 7 — Report all'utente
+### Step 7 — Lint incrementale
+
+Controlla subito le pagine appena scritte (broken link, slug duplicati, frontmatter) invece di aspettare il run notturno:
+
+```bash
+python .claude/skills/wiki-lint/scripts/lint.py --json --no-qmd --pages <written_paths...>
+```
+
+Costa pochi ms, non tocca lo storico lint. Se emergono warning, correggili ora (sono stati introdotti da questo ingest) o segnalali nel report.
+
+### Step 8 — Report all'utente
 
 Riporta:
 - ✓ N file scritti
-- ⚠ M warnings (cita i più importanti)
+- ⚠ M warnings (cita i più importanti, inclusi quelli del lint incrementale)
 - 📝 R review items pendenti (`pending.py reviews list`) — chiedi all'utente come gestirli
 - 🔀 K page merge LLM eseguiti (e quanti restano pending, se ne hai rimandati)
 - Cache HIT/MISS
@@ -191,8 +201,9 @@ Skill:
        warnings: [], reviews: [], merge_needed: [...],
        archived_source: "raw/sources/transformer-paper.pdf" }
    (finalize.py ha già spostato il sorgente da _inbox a raw/sources)
-6. Per ogni merge_needed: chiamata LLM merge → write
-7. Report all'utente (cita `archived_source`).
+6. Per ogni merge_needed: chiamata LLM merge → write → `pending.py merges resolve <id>`
+7. lint.py --json --no-qmd --pages wiki/sources/transformer-paper.md wiki/entities/vaswani-et-al.md ...
+8. Report all'utente (cita `archived_source`).
 ```
 
 ## Note importanti

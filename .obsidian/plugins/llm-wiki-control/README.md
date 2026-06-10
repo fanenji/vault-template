@@ -17,7 +17,7 @@ Plugin **desktop-only** (usa `child_process` per lanciare `pi`).
 - Tab **Ingest**: seleziona un file (o l'intera cartella `_inbox/clippings`) →
   `wiki-ingest`. Avviso costo token per batch > 5 file (regola di `CLAUDE.md`).
 - Tab **Lint**: esegue `wiki-lint` (audit) con checkbox `--fix`; report in
-  `wiki/lint-report.md`.
+  `_notes/lint/lint-report.md`.
 - Settings: percorso di `pi`, provider/model (dropdown da `pi --list-models`),
   cartella ingest, **Tavily API key** (→ `.llm-wiki/secrets.json`), toggle
   "mostra thinking" e "mostra i comandi eseguiti", **schedulazione lint**

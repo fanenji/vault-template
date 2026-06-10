@@ -213,7 +213,7 @@ export class LlmWikiSettingTab extends PluginSettingTab {
       .setName("Lint automatico")
       .setDesc(
         "Esegui periodicamente wiki-lint in background (senza --fix) e salva il " +
-          "report in wiki/lint-report.md."
+          "report in _notes/lint/lint-report.md."
       )
       .addToggle((t) =>
         t.setValue(this.plugin.settings.lintScheduleEnabled).onChange(async (v) => {

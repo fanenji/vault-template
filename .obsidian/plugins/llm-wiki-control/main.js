@@ -176,7 +176,7 @@ var _LlmWikiSettingTab = class _LlmWikiSettingTab extends import_obsidian.Plugin
     );
     new import_obsidian.Setting(containerEl).setName("Schedulazione lint").setHeading();
     new import_obsidian.Setting(containerEl).setName("Lint automatico").setDesc(
-      "Esegui periodicamente wiki-lint in background (senza --fix) e salva il report in wiki/lint-report.md."
+      "Esegui periodicamente wiki-lint in background (senza --fix) e salva il report in _notes/lint/lint-report.md."
     ).addToggle(
       (t) => t.setValue(this.plugin.settings.lintScheduleEnabled).onChange(async (v) => {
         this.plugin.settings.lintScheduleEnabled = v;
@@ -1042,7 +1042,7 @@ var LintPanel = class {
       return;
     }
     const fix = this.fixCheckbox.checked;
-    const prompt = "[llm-wiki:lint] Esegui un audit completo della wiki con la skill wiki-lint" + (fix ? " e applica le correzioni automatiche (--fix: frontmatter mancanti, stub missing-page)." : " (sola analisi, senza --fix).") + " Salva il report in wiki/lint-report.md.";
+    const prompt = "[llm-wiki:lint] Esegui un audit completo della wiki con la skill wiki-lint" + (fix ? " e applica le correzioni automatiche (--fix: frontmatter mancanti, stub missing-page)." : " (sola analisi, senza --fix).") + " Salva il report in _notes/lint/lint-report.md.";
     this.running = true;
     this.log.clear();
     const signal = this.log.beginRun();
@@ -1217,11 +1217,11 @@ var LlmWikiControlPlugin = class extends import_obsidian7.Plugin {
     try {
       await this.runner.runSkill({
         skill: "wiki-lint",
-        prompt: "[llm-wiki:lint] Esegui un audit della wiki con wiki-lint in modalit\xE0 non interattiva (senza --fix). Salva il report in wiki/lint-report.md.",
+        prompt: "[llm-wiki:lint] Esegui un audit della wiki con wiki-lint in modalit\xE0 non interattiva (senza --fix). Salva il report in _notes/lint/lint-report.md.",
         onEvent: () => {
         }
       });
-      new import_obsidian7.Notice("LLM Wiki: lint schedulato completato (wiki/lint-report.md).");
+      new import_obsidian7.Notice("LLM Wiki: lint schedulato completato (_notes/lint/lint-report.md).");
     } catch (e) {
       new import_obsidian7.Notice(`LLM Wiki: lint schedulato fallito \u2014 ${String(e)}`);
     } finally {

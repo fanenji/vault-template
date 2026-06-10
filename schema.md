@@ -48,6 +48,16 @@ query: "domanda originale"
 - Pagine sono **uniche per slug** — `entities/anthropic.md` e `concepts/anthropic.md` confliggono.
 - Wikilink risolti case-insensitive: `[[Anthropic]]` matcha `anthropic.md`.
 
+## Soppressione lint per-pagina
+
+Una pagina può dichiarare nel frontmatter quali tipi di issue lint sono intenzionali e non vanno ri-segnalati (acknowledgment esplicito):
+
+```yaml
+lint_ignore: [orphan, no-outlinks]
+```
+
+Esempio tipico: le pagine `query` sono spesso orfane per natura. I tipi sopprimibili sono quelli riportati da `wiki-lint` (`orphan`, `no-outlinks`, `naming`, ...). Usalo con parsimonia: sopprimere `broken-link` o `duplicate-slug` nasconde problemi reali.
+
 ## Workflow contraddizioni
 
 Quando l'ingest produce un'affermazione che contraddice una pagina esistente:
