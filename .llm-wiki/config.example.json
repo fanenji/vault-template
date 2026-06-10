@@ -1,27 +1,12 @@
 {
-  "qmd": {
-    "collection_name": "wiki",
-    "collection_path": "wiki",
-    "pattern": "**/*.md",
-    "exclude": ["index.md", "log.md"]
-  },
   "ingest": {
-    "batch_size": 5,
-    "max_retries": 3,
-    "preprocess": {
-      "tool": "markitdown",
-      "ocr": false
-    }
+    "max_chars": 50000
   },
   "deep_research": {
-    "provider": "tavily",
-    "fallback": "duckduckgo",
     "max_queries": 3,
-    "max_results_per_query": 5,
-    "tavily_api_key_env": "TAVILY_API_KEY"
+    "max_results_per_query": 5
   },
   "lint": {
-    "enabled_checks": ["orphan", "broken-link", "no-outlinks", "frontmatter", "semantic", "missing-page", "stale"],
     "semantic_similarity_threshold": 0.85
   }
 }

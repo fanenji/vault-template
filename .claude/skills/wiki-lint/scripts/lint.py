@@ -10,7 +10,11 @@ Il check `semantic` (LLM-based) NON è qui: viene delegato all'agente che
 invoca la skill. Vedi SKILL.md per i dettagli.
 
 Uso:
-    python lint.py [--vault PATH] [--json] [--fix-frontmatter] [--no-qmd]
+    python lint.py [--vault PATH] [--json] [--no-qmd] [--similarity 0.9]
+
+Il threshold di similarità per missing-page si legge (in ordine) da:
+--similarity, `.llm-wiki/config.json` (lint.semantic_similarity_threshold),
+default 0.85.
 
 Output:
     Stampa report markdown su stdout (default) o JSON con --json.
@@ -385,12 +389,25 @@ def find_vault_root(start: Path) -> Path:
         cur = cur.parent
 
 
+def load_vault_config(vault_root: Path) -> dict:
+    """Legge `.llm-wiki/config.json` (best-effort, {} se assente/corrotto)."""
+    p = vault_root / ".llm-wiki" / "config.json"
+    if not p.exists():
+        return {}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Deterministic structural lint for an llm-wiki vault.")
     ap.add_argument("--vault", type=Path, default=None, help="Vault root (default: auto-detect)")
     ap.add_argument("--json", action="store_true", help="Output JSON invece di markdown")
     ap.add_argument("--no-qmd", action="store_true", help="Salta il check missing-page via QMD")
-    ap.add_argument("--similarity", type=float, default=0.85, help="Threshold per missing-page (default 0.85)")
+    ap.add_argument("--similarity", type=float, default=None,
+                    help="Threshold per missing-page (default: config.json o 0.85)")
     ap.add_argument("--report-file", type=Path, default=None, help="Scrivi il report su file invece di stdout")
     ap.add_argument("--check", choices=["all", "structural", "frontmatter", "missing-page"], default="all",
                     help="Esegui solo un subset di check")
@@ -398,6 +415,10 @@ def main() -> int:
 
     vault_root = args.vault.resolve() if args.vault else find_vault_root(Path.cwd())
     wiki_root = vault_root / "wiki"
+
+    config = load_vault_config(vault_root)
+    similarity = args.similarity if args.similarity is not None else \
+        config.get("lint", {}).get("semantic_similarity_threshold", 0.85)
 
     if not wiki_root.is_dir():
         print(f"Errore: {wiki_root} non esiste", file=sys.stderr)
@@ -416,7 +437,7 @@ def main() -> int:
 
     if args.check in ("all", "missing-page") and not args.no_qmd:
         broken = [r for r in results if r.type == "broken-link"]
-        results.extend(check_missing_pages_via_qmd(broken, vault_root, args.similarity))
+        results.extend(check_missing_pages_via_qmd(broken, vault_root, similarity))
 
     # Output
     if args.json:

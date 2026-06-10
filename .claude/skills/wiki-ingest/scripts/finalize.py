@@ -5,15 +5,18 @@ finalize.py — finalizza l'ingest scrivendo i FILE blocks su disco.
 Riceve in input il testo grezzo dello "step-2 generation" (FILE/REVIEW blocks)
 e fa:
   1. Parse + sanitize + path safety check
-  2. Merge con pagine esistenti (se servono, segnala "merge_needed")
+  2. Merge con pagine esistenti (se servono, accoda in .llm-wiki/pending-merges.json)
   3. Write to disk (entities, concepts, sources, queries, synthesis)
-  4. Append a log.md
-  5. Overwrite di index.md e overview.md
-  6. Save cache SHA256
-  7. Aggiorna l'indice QMD (qmd update && qmd embed)
+  4. Append a log.md (riga canonica; eventuali blocchi log.md dell'LLM sono ignorati)
+  5. Rigenera wiki/index.md deterministicamente (build_index.py); overwrite di
+     overview.md con guardia anti-shrink (se il nuovo è <70% dell'esistente,
+     tiene l'esistente)
+  6. Persiste i REVIEW blocks in .llm-wiki/review/items.json
+  7. Save cache SHA256
+  8. Aggiorna l'indice QMD (qmd update && qmd embed)
 
 Stampa su stdout un riassunto JSON: { written_paths, warnings, reviews,
-merge_needed: [{path, existing, incoming}, ...] }.
+merge_needed: [{id, path, existing, incoming}, ...] }.
 
 Uso:
     python finalize.py \\
@@ -35,8 +38,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from _parse_file_blocks import parse_blocks, ParsedFileBlock
 from _sanitize import sanitize_ingested_content
-from _merge_pages import merge_pages, MergeOutcome
+from _merge_pages import merge_pages, MergeOutcome, BODY_SHRINK_THRESHOLD, parse_frontmatter
+from build_index import build_index
 import cache as cache_mod
+import pending as pending_mod
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -63,10 +68,12 @@ def write_file(vault_root: Path, rel_path: str, content: str) -> None:
     full.write_text(content, encoding="utf-8")
 
 
-def is_overwrite_target(rel_path: str) -> bool:
-    """Index e overview vengono sempre sovrascritti (no merge)."""
-    return rel_path in ("wiki/index.md", "wiki/overview.md") or \
-           rel_path.endswith("/index.md") or rel_path.endswith("/overview.md")
+def is_index_target(rel_path: str) -> bool:
+    return rel_path == "wiki/index.md" or rel_path.endswith("/index.md")
+
+
+def is_overview_target(rel_path: str) -> bool:
+    return rel_path == "wiki/overview.md" or rel_path.endswith("/overview.md")
 
 
 def is_log_target(rel_path: str) -> bool:
@@ -116,11 +123,23 @@ def finalize(
         full = vault_root / rel
 
         try:
-            if is_log_target(rel):
+            if is_log_target(rel) or is_index_target(rel):
+                # log.md: finalize appende la sua riga canonica più sotto.
+                # index.md: rigenerato deterministicamente da build_index.py.
+                # In entrambi i casi il blocco LLM è ridondante → skip.
+                continue
+            elif is_overview_target(rel):
+                # Guardia anti-shrink: una generazione troncata/pigra non deve
+                # cancellare l'overview esistente (stessa soglia del page merge).
                 existing = full.read_text(encoding="utf-8") if full.exists() else ""
-                merged = (existing.rstrip() + "\n\n" + sanitized.strip() + "\n") if existing else sanitized
-                write_file(vault_root, rel, merged)
-            elif is_overwrite_target(rel):
+                _, old_body = parse_frontmatter(existing)
+                _, new_body = parse_frontmatter(sanitized)
+                if old_body.strip() and len(new_body) < len(old_body) * BODY_SHRINK_THRESHOLD:
+                    warnings.append(
+                        f"`{rel}` new version is <{int(BODY_SHRINK_THRESHOLD * 100)}% of the existing one — "
+                        f"kept existing (likely truncated generation)"
+                    )
+                    continue
                 write_file(vault_root, rel, sanitized)
             else:
                 # Content page: merge con esistente se presente
@@ -128,19 +147,43 @@ def finalize(
                 outcome: MergeOutcome = merge_pages(sanitized, existing, source_path.name)
                 write_file(vault_root, rel, outcome.content)
                 if outcome.merge_body_needed:
+                    merge_id = pending_mod.add_merge(
+                        vault_root,
+                        page=rel,
+                        existing_body=outcome.existing_body,
+                        incoming_body=outcome.incoming_body,
+                        source=source_path.name,
+                    )
                     merge_needed.append({
+                        "id": merge_id,
                         "path": rel,
                         "existing_body": outcome.existing_body,
                         "incoming_body": outcome.incoming_body,
                     })
                     warnings.append(
-                        f"`{rel}` merged with array-union only — LLM body merge recommended (use prompts/merge.md)"
+                        f"`{rel}` merged with array-union only — LLM body merge required "
+                        f"(queued as {merge_id} in .llm-wiki/pending-merges.json)"
                     )
 
             written_paths.append(rel)
         except OSError as e:
             warnings.append(f'Failed to write "{rel}": {e}')
             hard_failures.append(rel)
+
+    # Persisti i REVIEW blocks (sopravvivono alla sessione, vedi schema.md)
+    for r in reviews:
+        try:
+            r["id"] = pending_mod.add_review(vault_root, review=dict(r), source=source_path.name)
+        except OSError as e:
+            warnings.append(f"Failed to persist review '{r.get('title')}': {e}")
+
+    # Rigenera l'indice deterministicamente dal filesystem
+    if written_paths:
+        try:
+            write_file(vault_root, "wiki/index.md", build_index(vault_root))
+            written_paths.append("wiki/index.md")
+        except OSError as e:
+            warnings.append(f"Failed to rebuild wiki/index.md: {e}")
 
     # Append log entry
     from datetime import datetime
@@ -160,13 +203,21 @@ def finalize(
     if not skip_qmd_update and written_paths:
         try:
             for cmd in (["qmd", "update"], ["qmd", "embed"]):
-                subprocess.run(
+                proc = subprocess.run(
                     cmd,
                     cwd=str(vault_root),
                     timeout=300,
                     check=False,
                     capture_output=True,
+                    text=True,
                 )
+                if proc.returncode != 0:
+                    stderr_tail = (proc.stderr or "").strip().splitlines()[-1:] or ["(no stderr)"]
+                    warnings.append(
+                        f"`{' '.join(cmd)}` exited {proc.returncode}: {stderr_tail[0]} "
+                        f"(index may be stale — run `qmd update && qmd embed` manually)"
+                    )
+                    break
         except (FileNotFoundError, subprocess.TimeoutExpired) as e:
             warnings.append(f"QMD index update failed: {e} (run `qmd update && qmd embed` manually)")
 

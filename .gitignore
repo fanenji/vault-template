@@ -1,10 +1,8 @@
 # State interno (rigenerabile)
 .llm-wiki/queue/
-.llm-wiki/ingest-cache/
-.llm-wiki/chats/
+.llm-wiki/ingest-cache.json
+.llm-wiki/pending-merges.json
 .llm-wiki/review/
-.llm-wiki/qmd-index.sqlite
-.llm-wiki/qmd-index.sqlite-*
 .llm-wiki/*.log
 
 # Indice QMD project-local (qmd 2.5.2, rigenerabile con `qmd update && qmd embed`)

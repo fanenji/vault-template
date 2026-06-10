@@ -43,7 +43,8 @@ def _strip_outer_code_fence(content: str) -> str:
     close_match = _CLOSE_FENCE_RE.search(after_open)
     if not close_match:
         return content
-    return after_open[:close_match.start()]
+    # close_match consuma anche il newline che precede il fence: ripristinalo
+    return after_open[:close_match.start()] + "\n"
 
 
 def _strip_frontmatter_key_prefix(content: str) -> str:

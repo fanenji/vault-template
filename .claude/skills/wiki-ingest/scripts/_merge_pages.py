@@ -20,9 +20,12 @@ from datetime import date
 
 UNION_FIELDS = ("sources", "tags", "related")
 LOCKED_FIELDS = ("type", "title", "created")
+MANAGED_FIELDS = UNION_FIELDS + LOCKED_FIELDS + ("updated",)
 BODY_SHRINK_THRESHOLD = 0.7  # come backend originale
 
 _FM_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
+# Top-level key YAML a colonna 0 (inizio di un nuovo segmento di frontmatter)
+_TOP_KEY_RE = re.compile(r"^([A-Za-z_][\w.-]*)\s*:")
 
 
 @dataclass
@@ -35,8 +38,127 @@ class MergeOutcome:
     fallback_used: bool = False        # True se il merge è stato un fallback semplice
 
 
+def fm_payload(content: str) -> tuple[str | None, str]:
+    """Estrae il payload grezzo del frontmatter (testo fra i `---`) e il body."""
+    m = _FM_RE.match(content)
+    if not m:
+        return None, content
+    return m.group(1), content[m.end():]
+
+
+def _split_fm_segments(payload: str) -> list[tuple[str | None, list[str]]]:
+    """
+    Spezza il payload frontmatter in segmenti top-level: (key, righe).
+
+    Un segmento inizia a ogni `key:` a colonna 0; righe indentate, item di
+    block sequence (`- ...`) e commenti/righe vuote si attaccano al segmento
+    corrente. Righe orfane prima della prima key → segmento con key=None.
+    Serve a manipolare singoli campi preservando il resto byte-per-byte
+    (incluse strutture nested che il parser semplificato non capisce).
+    """
+    segments: list[tuple[str | None, list[str]]] = []
+    cur_key: str | None = None
+    cur_lines: list[str] = []
+    started = False
+
+    for line in payload.split("\n"):
+        m = _TOP_KEY_RE.match(line)
+        if m:
+            if started:
+                segments.append((cur_key, cur_lines))
+            cur_key, cur_lines, started = m.group(1), [line], True
+        else:
+            if not started:
+                started = True  # righe orfane iniziali (commenti, ecc.)
+            cur_lines.append(line)
+    if started:
+        segments.append((cur_key, cur_lines))
+    return segments
+
+
+def _render_field(key: str, value) -> str:
+    """Renderizza un singolo campo gestito in YAML flow style."""
+    if value is None:
+        return f"{key}:"
+    if isinstance(value, list):
+        items = ", ".join(
+            f'"{x}"' if isinstance(x, str) and (":" in x or "[" in x) else str(x)
+            for x in value
+        )
+        return f"{key}: [{items}]"
+    if isinstance(value, bool):
+        return f"{key}: {str(value).lower()}"
+    if isinstance(value, str) and ":" in value:
+        return f'{key}: "{value}"'
+    return f"{key}: {value}"
+
+
+def render_merged_frontmatter(
+    primary_payload: str | None,
+    secondary_payload: str | None,
+    managed: dict,
+) -> str:
+    """
+    Costruisce il payload frontmatter del merge:
+      - campi NON gestiti del primary (pagina nuova / output LLM): verbatim
+      - campi NON gestiti presenti SOLO nel secondary (pagina esistente):
+        verbatim in coda (i campi custom non si perdono mai)
+      - campi gestiti (union/locked/updated): renderizzati da `managed`
+
+    Lavorare sulle righe grezze preserva valori nested/multi-riga che il
+    parser semplificato non sa fare roundtrip.
+    """
+    managed_keys = set(managed)
+    out_lines: list[str] = []
+    primary_keys: set[str] = set()
+
+    for key, lines in _split_fm_segments(primary_payload or ""):
+        if key is not None:
+            primary_keys.add(key)
+        if key in managed_keys:
+            continue
+        out_lines.extend(lines)
+
+    for key, lines in _split_fm_segments(secondary_payload or ""):
+        if key is None or key in managed_keys or key in primary_keys:
+            continue
+        out_lines.extend(lines)
+
+    # Rimuovi righe vuote in coda ai segmenti preservati
+    while out_lines and not out_lines[-1].strip():
+        out_lines.pop()
+
+    for key in MANAGED_FIELDS:
+        if key in managed:
+            out_lines.append(_render_field(key, managed[key]))
+
+    return "\n".join(out_lines)
+
+
+def _managed_values(old_fm: dict, new_fm: dict, today_str: str,
+                    extra_unions: dict | None = None) -> dict:
+    """Calcola i valori dei campi gestiti: locked dall'esistente, array union, updated."""
+    managed: dict = {}
+    for f in UNION_FIELDS:
+        base = merge_array_field(old_fm.get(f), new_fm.get(f))
+        if extra_unions and f in extra_unions:
+            base = merge_array_field(base, extra_unions.get(f))
+        managed[f] = base
+    for f in LOCKED_FIELDS:
+        val = old_fm.get(f) if old_fm.get(f) else new_fm.get(f)
+        if val is not None:
+            managed[f] = val
+    managed["updated"] = today_str
+    return managed
+
+
 def parse_frontmatter(content: str) -> tuple[dict, str]:
-    """Parse frontmatter best-effort. Ritorna (dict, body)."""
+    """
+    Parse frontmatter best-effort. Ritorna (dict, body).
+    Gestisce scalari, flow list `[a, b]` e block list (`key:` seguito da
+    righe `- item`). Strutture nested più complesse restano fuori dal dict
+    (ma sopravvivono comunque al merge via render_merged_frontmatter).
+    """
     m = _FM_RE.match(content)
     if not m:
         return {}, content
@@ -44,9 +166,12 @@ def parse_frontmatter(content: str) -> tuple[dict, str]:
     body = content[m.end():]
 
     fm: dict = {}
-    for line in raw.split("\n"):
-        line = line.rstrip()
-        if not line or line.startswith("#") or ":" not in line:
+    lines = raw.split("\n")
+    i = 0
+    while i < len(lines):
+        line = lines[i].rstrip()
+        i += 1
+        if not line or line.lstrip().startswith("#") or ":" not in line:
             continue
         key, _, value = line.partition(":")
         key = key.strip()
@@ -57,7 +182,20 @@ def parse_frontmatter(content: str) -> tuple[dict, str]:
             items = [v.strip().strip('"').strip("'") for v in value[1:-1].split(",") if v.strip()]
             fm[key] = items
         elif value == "":
-            fm[key] = None
+            # Possibile block list: righe successive `- item`
+            items = []
+            j = i
+            while j < len(lines):
+                im = re.match(r"^\s*-\s+(.*?)\s*$", lines[j])
+                if not im:
+                    break
+                items.append(im.group(1).strip().strip('"').strip("'"))
+                j += 1
+            if items:
+                fm[key] = items
+                i = j
+            else:
+                fm[key] = None
         else:
             fm[key] = value
     return fm, body
@@ -98,31 +236,20 @@ def merge_pages(
 
     old_fm, old_body = parse_frontmatter(existing_content)
     new_fm, new_body = parse_frontmatter(new_content)
+    old_payload, _ = fm_payload(existing_content)
+    new_payload, _ = fm_payload(new_content)
 
-    # Array fields union
-    merged_fm = dict(new_fm)
-    for field in UNION_FIELDS:
-        merged_fm[field] = merge_array_field(old_fm.get(field), new_fm.get(field))
-
-    # Locked fields: preserva esistente se presente
-    for field in LOCKED_FIELDS:
-        existing_val = old_fm.get(field)
-        if existing_val:
-            merged_fm[field] = existing_val
-
-    # Updated = oggi
-    merged_fm["updated"] = today_str
+    managed = _managed_values(old_fm, new_fm, today_str)
+    merged_payload = render_merged_frontmatter(new_payload, old_payload, managed)
+    merged = _wrap(merged_payload, new_body)
 
     # Body merge: se i bodies sono uguali (modulo whitespace), no LLM needed
     if old_body.strip() == new_body.strip():
-        return MergeOutcome(
-            content=_render(merged_fm, new_body),
-            merge_body_needed=False,
-        )
+        return MergeOutcome(content=merged, merge_body_needed=False)
 
     # Bodies differiscono → segnala bisogno LLM merge
     return MergeOutcome(
-        content=_render(merged_fm, new_body),  # fallback: usa new body con fm merged
+        content=merged,  # fallback: usa new body con fm merged
         merge_body_needed=True,
         existing_body=old_body,
         incoming_body=new_body,
@@ -147,65 +274,36 @@ def apply_llm_merge_result(
     """
     today_str = today or date.today().isoformat()
 
-    llm_fm, llm_body = parse_frontmatter(llm_output)
-    if not llm_fm:
-        # Output LLM senza frontmatter → reject, fallback
-        old_fm, old_body = parse_frontmatter(existing_content)
-        new_fm, new_body = parse_frontmatter(incoming_content)
-        for f in UNION_FIELDS:
-            new_fm[f] = merge_array_field(old_fm.get(f), new_fm.get(f))
-        for f in LOCKED_FIELDS:
-            if old_fm.get(f):
-                new_fm[f] = old_fm[f]
-        new_fm["updated"] = today_str
-        return _render(new_fm, new_body)
-
     old_fm, old_body = parse_frontmatter(existing_content)
     new_fm, new_body = parse_frontmatter(incoming_content)
+    old_payload, _ = fm_payload(existing_content)
+    new_payload, _ = fm_payload(incoming_content)
+
+    llm_fm, llm_body = parse_frontmatter(llm_output)
+    llm_payload, _ = fm_payload(llm_output)
+
+    def _fallback() -> str:
+        managed = _managed_values(old_fm, new_fm, today_str)
+        payload = render_merged_frontmatter(new_payload, old_payload, managed)
+        return _wrap(payload, new_body)
+
+    if not llm_fm:
+        # Output LLM senza frontmatter → reject, fallback
+        return _fallback()
 
     # Sanity check body length
     threshold = max(len(old_body), len(new_body)) * BODY_SHRINK_THRESHOLD
     if len(llm_body) < threshold:
         # LLM ha probabilmente troncato. Fallback.
-        for f in UNION_FIELDS:
-            new_fm[f] = merge_array_field(old_fm.get(f), new_fm.get(f))
-        for f in LOCKED_FIELDS:
-            if old_fm.get(f):
-                new_fm[f] = old_fm[f]
-        new_fm["updated"] = today_str
-        return _render(new_fm, new_body)
+        return _fallback()
 
-    # OK: apply post-processing all'output LLM
-    for f in LOCKED_FIELDS:
-        if old_fm.get(f):
-            llm_fm[f] = old_fm[f]
-    for f in UNION_FIELDS:
-        llm_fm[f] = merge_array_field(
-            old_fm.get(f),
-            merge_array_field(new_fm.get(f), llm_fm.get(f)),
-        )
-    llm_fm["updated"] = today_str
-
-    return _render(llm_fm, llm_body)
+    # OK: apply post-processing all'output LLM (union include anche i valori LLM)
+    managed = _managed_values(old_fm, new_fm, today_str,
+                              extra_unions={f: llm_fm.get(f) for f in UNION_FIELDS})
+    payload = render_merged_frontmatter(llm_payload, old_payload, managed)
+    return _wrap(payload, llm_body)
 
 
-def _render(fm: dict, body: str) -> str:
-    """Render frontmatter + body in markdown standard."""
-    lines = ["---"]
-    for k, v in fm.items():
-        if v is None:
-            lines.append(f"{k}:")
-        elif isinstance(v, list):
-            items = ", ".join(
-                f'"{x}"' if isinstance(x, str) and (":" in x or "[" in x) else str(x)
-                for x in v
-            )
-            lines.append(f"{k}: [{items}]")
-        elif isinstance(v, bool):
-            lines.append(f"{k}: {str(v).lower()}")
-        elif isinstance(v, str) and ":" in v:
-            lines.append(f'{k}: "{v}"')
-        else:
-            lines.append(f"{k}: {v}")
-    lines.append("---")
-    return "\n".join(lines) + "\n" + body.lstrip("\n")
+def _wrap(fm_payload_text: str, body: str) -> str:
+    """Avvolge payload frontmatter + body in markdown standard."""
+    return "---\n" + fm_payload_text + "\n---\n" + body.lstrip("\n")

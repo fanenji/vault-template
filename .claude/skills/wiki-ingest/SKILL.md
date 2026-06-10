@@ -11,7 +11,9 @@ Pipeline di ingest a 2 step (analisi → generazione) con porting fedele del bac
 - Coda persistente
 - Parsing robusto FILE blocks (gestisce CRLF, troncamenti, code fence, case variants)
 - Sanitization output LLM (3 fix ricorrenti per frontmatter corrotto)
-- Page merge (array union + LLM body merge condizionato)
+- Page merge (array union + LLM body merge condizionato, con coda persistente in `.llm-wiki/pending-merges.json`)
+- Persistenza REVIEW blocks in `.llm-wiki/review/items.json`
+- Rigenerazione deterministica di `wiki/index.md` (`build_index.py`)
 - Aggiornamento indice QMD post-ingest
 
 ## Quando usarla
@@ -125,48 +127,53 @@ python .claude/skills/wiki-ingest/scripts/finalize.py \
 Output JSON con:
 - `written_paths`: file scritti in `wiki/`
 - `warnings`: warning del parser/sanitizer
-- `reviews`: blocchi REVIEW estratti (passa al review queue se l'utente lo vuole)
-- `merge_needed`: lista pagine che necessitano LLM body merge (vedi Step 6)
+- `reviews`: blocchi REVIEW estratti (persistiti anche in `.llm-wiki/review/items.json`)
+- `merge_needed`: lista pagine che necessitano LLM body merge, con `id` della coda persistente (vedi Step 6)
 - `hard_failures`: errori FS irrecuperabili
 - `archived_source`: path (rel) del sorgente spostato in `raw/sources/`, oppure `null`
 
 `finalize.py` si occupa automaticamente di:
 - Sanitize (rimuove code fence, ripara frontmatter)
 - Path safety check (reject `..`, absolute paths, traversal)
-- Append a `wiki/log.md`
-- Overwrite di `wiki/index.md` e `wiki/overview.md`
+- Append a `wiki/log.md` (riga canonica; eventuali blocchi FILE per `log.md` o `index.md` emessi dall'LLM sono scartati)
+- **Rigenerazione deterministica di `wiki/index.md`** via `build_index.py` (l'indice è derivato dal filesystem, mai dall'LLM)
+- Overwrite di `wiki/overview.md` con **guardia anti-shrink**: se il nuovo body è <70% dell'esistente, tiene l'esistente (generazione probabilmente troncata)
+- **Persistenza code**: merge pendenti in `.llm-wiki/pending-merges.json`, review in `.llm-wiki/review/items.json` (sopravvivono al crash della sessione)
 - Save cache SHA256 (se nessun hard failure)
-- `qmd update && qmd embed` (re-indicizza + embedda i nuovi file; indice locale `.qmd/` di qmd 2.5.2)
+- `qmd update && qmd embed` (re-indicizza + embedda i nuovi file; indice locale `.qmd/` di qmd 2.5.2). Exit code non-zero → warning nel report
 - **Archiviazione sorgente**: su ingest pienamente riuscito sposta l'originale da `_inbox/` a `raw/sources/` (move). Se è già sotto `raw/sources/` non lo tocca. Disattivabile con `--no-archive`. **Non devi spostare il file a mano**: lo fa lo script.
 
 ### Step 6 — Page merge LLM (se `merge_needed` non vuoto)
 
-Per ogni elemento in `merge_needed` (significa: la pagina esisteva con body diverso, finalize ha applicato solo array-field union):
+⚠ **Non opzionale**: finalize ha già scritto su disco il body *nuovo*; il body esistente sopravvive solo in `.llm-wiki/pending-merges.json`. Finché un merge resta pending, quel contenuto non è nella wiki.
+
+Per ogni elemento in `merge_needed` (o, se riprendi una sessione interrotta, in `python .claude/skills/wiki-ingest/scripts/pending.py merges list`):
 
 1. Leggi `.claude/skills/wiki-ingest/prompts/merge.md`
 2. Sostituisci `{{existing_content}}`, `{{incoming_content}}`, `{{source_filename}}`
 3. Chiama l'LLM
 4. Scrivi il risultato sul path con `apply_llm_merge_result` (importa da `_merge_pages.py`) per applicare i locked fields + sanity check
+5. Marca l'entry come gestita: `python .claude/skills/wiki-ingest/scripts/pending.py merges resolve <id>`
 
 Snippet rapido:
 
 ```python
 from _merge_pages import apply_llm_merge_result
 # llm_output = risposta LLM
-# existing = leggi pagina dal disco prima del fix
+# existing = existing_body dall'entry pending (la pagina su disco ha già il body nuovo)
 final = apply_llm_merge_result(llm_output, existing, incoming)
 write_file(rel_path, final)
 ```
 
-(Se vuoi saltare lo step 6 per ora, le pagine resteranno con array-union + new body — coerenti, ma con meno coesione del merge LLM. Va segnalato all'utente.)
+(Se devi rimandare lo Step 6, le pagine restano con array-union + new body — coerenti, ma il body precedente è solo nella coda pending. Segnalalo all'utente e NON cancellare `pending-merges.json`.)
 
 ### Step 7 — Report all'utente
 
 Riporta:
 - ✓ N file scritti
 - ⚠ M warnings (cita i più importanti)
-- 📝 R review items (chiedi all'utente come gestirli)
-- 🔀 K page merge LLM eseguiti
+- 📝 R review items pendenti (`pending.py reviews list`) — chiedi all'utente come gestirli
+- 🔀 K page merge LLM eseguiti (e quanti restano pending, se ne hai rimandati)
 - Cache HIT/MISS
 
 ## Esempio d'uso (singolo file)
@@ -196,6 +203,16 @@ Skill:
 - **Batch grossi** (>10 file): processa uno per volta, non parallelizzare. Il pipeline a 2 step satura il context; ingest paralleli rischiano errori.
 - **Idempotente**: rilancia la skill su un file già ingerito → la cache restituisce HIT e nulla viene riscritto. Forza re-ingest con `python cache.py remove <filename>`.
 - **Recovery**: se l'ingest crasha a metà, la coda mantiene lo stato (`queue.py reset-failed` per riprovare). Le pagine scritte parzialmente restano (sono coerenti perché ogni FILE block è atomico).
+
+## Test
+
+I moduli delicati (parser FILE blocks, merge, sanitize, cache, build_index) hanno una suite unittest (stdlib, nessuna dipendenza):
+
+```bash
+cd .claude/skills/wiki-ingest/tests && python3 -m unittest discover
+```
+
+Eseguila dopo qualsiasi modifica agli script in `scripts/`.
 
 ## Limiti correnti
 

@@ -30,7 +30,14 @@ Ogni skill ha un proprio `SKILL.md` con il contratto operativo.
 
 ## Stato interno
 
-`.llm-wiki/` contiene queue di ingest, cache SHA256, indice QMD. **Non modificare a mano** salvo per debug. Le skill aggiornano lo stato in modo idempotente.
+`.llm-wiki/` contiene queue di ingest, cache SHA256, merge pendenti (`pending-merges.json`) e coda di review (`review/items.json`). L'indice QMD vive a parte in `.qmd/` (project-local). **Non modificare a mano** salvo per debug. Le skill aggiornano lo stato in modo idempotente.
+
+Dopo un ingest, controlla le code pendenti con:
+
+```bash
+python .claude/skills/wiki-ingest/scripts/pending.py merges list   # body merge LLM da completare
+python .claude/skills/wiki-ingest/scripts/pending.py reviews list  # decisioni umane richieste
+```
 
 ## `_system/`
 
@@ -43,7 +50,9 @@ Il pattern segue le convenzioni di Obsidian: `_system/` raggruppa tutto ciò che
 
 ## Retrieval
 
-La ricerca nella wiki (lessicale + semantica + reranking) usa [QMD](https://github.com/tobi/qmd). Comandi shell utili:
+La ricerca nella wiki (lessicale + semantica + reranking) usa [QMD](https://github.com/tobi/qmd) 2.5.2. L'indice è **project-local** in `.qmd/` (discovery dal cwd, come git): esegui sempre `qmd` dalla **vault root**. Il vecchio flag `--db` non esiste più — non usarlo.
+
+Comandi shell utili:
 
 ```bash
 qmd query "domanda" --json -n 10    # hybrid search con reranking
@@ -51,13 +60,13 @@ qmd vsearch "concetto" -n 5         # vector-only
 qmd search "termine esatto"         # BM25-only
 qmd get "wiki/entities/foo.md"      # recupera un file
 qmd multi-get "wiki/concepts/*.md"  # batch
-qmd embed --update                  # rinfresca l'indice dopo modifiche
+qmd update && qmd embed             # rinfresca l'indice dopo modifiche
 ```
 
-L'indice è in `.llm-wiki/qmd-index.sqlite`. Dopo ogni ingest, le skill chiamano `qmd embed --update` per mantenerlo coerente.
+Dopo ogni ingest, le skill chiamano `qmd update && qmd embed` per mantenere l'indice coerente.
 
 **QMD — primo avvio**: al primo `qmd embed` e al primo `qmd query`, QMD scarica due modelli GGUF (~400 MB totali). Richiede connessione. Se il comando va in timeout:
-1. Rilancia `qmd embed --db .llm-wiki/qmd-index.sqlite` su una rete stabile.
+1. Rilancia `qmd update && qmd embed` (dalla vault root) su una rete stabile.
 2. Per le query, usa `--no-rerank` per saltare il secondo modello: `qmd query "..." --no-rerank`.
 
 ## Configurazione Tavily (deep-research)

@@ -2,12 +2,16 @@
 """
 cache.py — gestione cache SHA256 dell'ingest.
 
-Porting fedele di src/lib/ingest-cache.ts.
+Porting di src/lib/ingest-cache.ts.
 
 Cache file: `.llm-wiki/ingest-cache.json` con shape:
-    { "entries": { "<source_filename>": { "hash": "<sha256>", "timestamp": ..., "files_written": [...] } } }
+    { "entries": { "<filename>@<sha256[:12]>": { "hash": "<sha256>", "timestamp": ..., "files_written": [...] } } }
 
-Cache hit: hash invariato AND tutti i files_written esistono ancora sul disco.
+La chiave include un prefisso dell'hash del contenuto: due sorgenti omonime
+in cartelle diverse (contenuto diverso) coesistono senza sovrascriversi, e
+un file archiviato da _inbox/ a raw/sources/ (stesso contenuto) continua a
+fare HIT. Cache hit: entry presente per (nome, hash) AND tutti i
+files_written esistono ancora sul disco.
 
 Uso:
     python cache.py check <source_path>           # exit 0 se hit (stampa files), 1 se miss
@@ -68,15 +72,20 @@ def sha256_text(s: str) -> str:
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 
+def entry_key(source_filename: str, content_hash: str) -> str:
+    return f"{source_filename}@{content_hash[:12]}"
+
+
 def check_cache(vault_root: Path, source_path: Path) -> list[str] | None:
     """Ritorna lista files cached se hit, None se miss."""
     cache = load_cache(vault_root)
-    source_filename = source_path.name
-    entry = cache.get("entries", {}).get(source_filename)
+    current_hash = sha256_file(source_path)
+    entries = cache.get("entries", {})
+    # Lookup per chiave nome@hash; fallback sul formato legacy (solo nome)
+    entry = entries.get(entry_key(source_path.name, current_hash)) or entries.get(source_path.name)
     if not entry:
         return None
 
-    current_hash = sha256_file(source_path)
     if entry.get("hash") != current_hash:
         return None
 
@@ -92,8 +101,9 @@ def check_cache(vault_root: Path, source_path: Path) -> list[str] | None:
 
 def save_entry(vault_root: Path, source_path: Path, files_written: list[str]) -> None:
     cache = load_cache(vault_root)
-    cache.setdefault("entries", {})[source_path.name] = {
-        "hash": sha256_file(source_path),
+    content_hash = sha256_file(source_path)
+    cache.setdefault("entries", {})[entry_key(source_path.name, content_hash)] = {
+        "hash": content_hash,
         "timestamp": time.time(),
         "files_written": files_written,
     }
@@ -101,12 +111,17 @@ def save_entry(vault_root: Path, source_path: Path, files_written: list[str]) ->
 
 
 def remove_entry(vault_root: Path, source_filename: str) -> bool:
+    """Rimuove tutte le entry per quel basename (qualunque hash) — forza re-ingest."""
     cache = load_cache(vault_root)
-    if source_filename in cache.get("entries", {}):
-        del cache["entries"][source_filename]
-        save_cache(vault_root, cache)
-        return True
-    return False
+    entries = cache.get("entries", {})
+    to_remove = [k for k in entries
+                 if k == source_filename or k.startswith(f"{source_filename}@")]
+    if not to_remove:
+        return False
+    for k in to_remove:
+        del entries[k]
+    save_cache(vault_root, cache)
+    return True
 
 
 def main() -> int:

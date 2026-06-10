@@ -33,7 +33,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from web_search import search, find_vault_root
+from web_search import search, find_vault_root, default_max_results
 
 
 def slugify(text: str, max_len: int = 50) -> str:
@@ -43,9 +43,11 @@ def slugify(text: str, max_len: int = 50) -> str:
     return s[:max_len].rstrip("-") or "untitled"
 
 
-def search_multi(queries: list[str], max_results: int = 5) -> dict:
+def search_multi(queries: list[str], max_results: int | None = None) -> dict:
     """Esegui search per ogni query, dedup per URL, ritorna risultati unificati."""
     vault_root = find_vault_root(Path.cwd())
+    if max_results is None:
+        max_results = default_max_results(vault_root)
     all_results: list[dict] = []
     seen_urls: set[str] = set()
     provider_counts: dict[str, int] = {}
@@ -131,7 +133,8 @@ def main() -> int:
 
     ap_sm = sub.add_parser("search-multi", help="Search su più query, dedup URLs")
     ap_sm.add_argument("queries", nargs="+")
-    ap_sm.add_argument("--max-results", type=int, default=5)
+    ap_sm.add_argument("--max-results", type=int, default=None,
+                       help="Risultati per query (default: config.json o 5)")
 
     ap_save = sub.add_parser("save-result", help="Salva sintesi research in wiki/queries/")
     ap_save.add_argument("--topic", required=True)

@@ -19,9 +19,9 @@ All wiki pages generated from this source MUST include this filename in their fr
 1. A source summary page at **wiki/sources/{{source_basename}}.md** (MUST use this exact path)
 2. Entity pages in wiki/entities/ for key entities identified in the analysis
 3. Concept pages in wiki/concepts/ for key concepts identified in the analysis
-4. An updated wiki/index.md — add new entries to existing categories, preserve all existing entries
-5. A log entry for wiki/log.md (just the new entry to append, format: ## [YYYY-MM-DD] ingest | Title)
-6. An updated wiki/overview.md — a high-level summary of what the entire wiki covers, updated to reflect the newly ingested source. This should be a comprehensive 2-5 paragraph overview of ALL topics in the wiki, not just the new source.
+4. An updated wiki/overview.md — a high-level summary of what the entire wiki covers, updated to reflect the newly ingested source. This should be a comprehensive 2-5 paragraph overview of ALL topics in the wiki, not just the new source. It must NOT be shorter than the current overview unless content was genuinely consolidated.
+
+Do NOT generate wiki/index.md or wiki/log.md — they are maintained automatically by the pipeline (any FILE block targeting them will be discarded).
 
 ## Frontmatter Rules (CRITICAL — parser is strict)
 
@@ -102,7 +102,7 @@ For `suggestion` and `missing-page` reviews, the `SEARCH:` field must contain 2-
 {{/if}}
 
 {{#if index}}
-## Current Wiki Index (preserve all existing entries, add new ones)
+## Current Wiki Index (context only — use it to cross-reference existing pages; do NOT regenerate it)
 {{index}}
 {{/if}}
 

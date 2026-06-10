@@ -60,13 +60,28 @@ Oppure usa il tuo tool `Read` per ciascun path. Limita a 5-8 file per non satura
 
 ### 3. Sintesi
 
+> **REGOLA FONDAMENTALE — epistemic hygiene**
+>
+> Ogni affermazione nella risposta deve rientrare in una delle due categorie seguenti, **mai mescolate implicitamente**:
+>
+> | Categoria | Fonte | Marcatura richiesta |
+> |---|---|---|
+> | **Fatto wiki** | Presente letteralmente o parafrasabile senza gap logici dai file letti | `[[wikilink]]` con citazione della pagina |
+> | **Deduzione** | Inferita dal modello per analogia, generalizzazione o ragionamento | `_(deduzione: ...)_` con la premessa esplicitata |
+>
+> **È vietato presentare una deduzione come fatto wiki.** Se la wiki parla di X e l'utente chiede Y, e Y si può dedurre da X per analogia, quella deduzione va **sempre** esplicitata come tale — anche se sembra ovvia.
+>
+> **Segnale di allarme**: se stai per scrivere qualcosa che non puoi citare con un `[[wikilink]]` e non è una deduzione esplicitata, **non scriverlo**. Di' invece: "La wiki non contiene informazioni su questo aspetto specifico."
+
 Componi la risposta seguendo queste regole:
 
 - **Cita sempre con `[[wikilink]]`** quando menzioni un'entità o concetto che ha una pagina nella wiki (usa il basename senza `.md` e senza il path della cartella, es. `[[anthropic]]` non `[[entities/anthropic]]`).
-- **Distingui** chiaramente fra (a) informazioni dalla wiki e (b) tue inferenze. Le inferenze vanno marcate "_(inferenza, non documentata nella wiki)_".
-- **Non inventare** informazioni che non sono nei file letti. Se la wiki dice X e l'utente chiede Y che non c'è, dillo esplicitamente.
+- **Fatti wiki**: ogni claim sostantivo deve avere un `[[wikilink]]` di supporto. Se non riesci a citare una pagina specifica, il claim non è un fatto wiki.
+- **Deduzioni**: ogni inferenza, analogia o generalizzazione **deve** essere marcata esplicitamente con `_(deduzione: <premessa usata>)_`. Esempio: "È probabile che il progetto usi lo stesso approccio _(deduzione: per analogia con [[progetto-simile]] che segue lo stesso pattern)_."
+- **Gap espliciti**: se la wiki non contiene l'informazione richiesta, dillo chiaramente: "La wiki non documenta X. [Suggerisco `deep-research` per approfondire.]"
+- **Non colmare i gap silenziosamente**: è preferibile una risposta parziale con lacune dichiarate a una risposta completa con deduzioni non marcate.
 - **Lingua**: rispondi nella lingua dell'utente (auto-detect dalla domanda).
-- **Citazioni contestuali**: se una pagina specifica supporta una claim, cita `[[nome-pagina]]` alla fine della frase. Esempio: "L'azienda è stata fondata nel 2021 [[anthropic]]."
+- **Citazioni contestuali**: cita `[[nome-pagina]]` alla fine della frase che il contenuto supporta. Esempio: "L'azienda è stata fondata nel 2021 [[anthropic]]."
 
 ### 4. Salvataggio (opzionale)
 
@@ -120,7 +135,11 @@ qmd multi-get wiki/entities/anthropic.md wiki/concepts/constitutional-ai.md wiki
 ```
 
 **Risposta**:
-> [[anthropic]] è un'azienda di AI safety fondata nel 2021. Ha sviluppato [[constitutional-ai]] come metodo di allineamento basato su principi espliciti, alternativa a RLHF puro. La loro posizione nel landscape è documentata in [[ai-safety-landscape-2025]] dove appaiono come uno dei tre principali lab focalizzati sulla sicurezza.
+> [[anthropic]] è un'azienda di AI safety fondata nel 2021 [[anthropic]]. Ha sviluppato [[constitutional-ai]] come metodo di allineamento basato su principi espliciti, alternativa a RLHF puro [[constitutional-ai]]. La loro posizione nel landscape è documentata in [[ai-safety-landscape-2025]] dove appaiono come uno dei tre principali lab focalizzati sulla sicurezza [[ai-safety-landscape-2025]].
+>
+> La wiki non documenta i budget destinati alla sicurezza né i nomi dei ricercatori principali del team safety.
+>
+> _(deduzione: dato che [[constitutional-ai]] è il loro metodo pubblico principale, è probabile che guidi anche i lavori interni non pubblicati — ma questo non è documentato nella wiki)_
 >
 > **Fonti consultate**:
 > - `wiki/entities/anthropic.md`

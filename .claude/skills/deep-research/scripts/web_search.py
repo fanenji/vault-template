@@ -42,6 +42,22 @@ def find_vault_root(start: Path) -> Path:
         cur = cur.parent
 
 
+def load_vault_config(vault_root: Path) -> dict:
+    """Legge `.llm-wiki/config.json` (best-effort, {} se assente/corrotto)."""
+    p = vault_root / ".llm-wiki" / "config.json"
+    if not p.exists():
+        return {}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def default_max_results(vault_root: Path) -> int:
+    return load_vault_config(vault_root).get("deep_research", {}).get("max_results_per_query", 5)
+
+
 def load_tavily_key(vault_root: Path) -> str | None:
     key = os.environ.get("TAVILY_API_KEY", "").strip()
     if key:
@@ -164,13 +180,16 @@ def search(query: str, max_results: int = 5, vault_root: Path | None = None) -> 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Web search (Tavily → DDG fallback)")
     ap.add_argument("query", help="Search query")
-    ap.add_argument("--max-results", type=int, default=5)
+    ap.add_argument("--max-results", type=int, default=None,
+                    help="Risultati per query (default: config.json o 5)")
     ap.add_argument("--json", action="store_true", help="Output JSON (default)")
     ap.add_argument("--provider", choices=["auto", "tavily", "duckduckgo"], default="auto",
                     help="Forza un provider specifico")
     args = ap.parse_args()
 
     vault_root = find_vault_root(Path.cwd())
+    if args.max_results is None:
+        args.max_results = default_max_results(vault_root)
 
     if args.provider == "tavily":
         key = load_tavily_key(vault_root)
