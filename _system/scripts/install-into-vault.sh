@@ -9,11 +9,16 @@
 #
 # Policy (vedi README):
 #   - Machinery (.claude/skills, .claude/commands, _system/scripts, file del
-#     plugin) → SEMPRE sincronizzata/sovrascritta.
+#     plugin, .llm-wiki/config.example.json, .llm-wiki/README.md) → SEMPRE
+#     sincronizzata/sovrascritta.
 #   - Istruzioni (CLAUDE.md, AGENTS.md) → aggiornate, ma con backup .bak se
 #     differiscono dalla source.
+#   - .gitignore → merge non distruttivo: aggiunge i pattern di stato llm-wiki
+#     mancanti, non rimuove mai righe esistenti.
 #   - Contenuti per-vault (purpose.md, schema.md, wiki/, raw/, _inbox/, _notes/,
-#     _system/canvas, _system/templates, le tue note) → MAI toccati.
+#     _system/canvas, _system/templates, le tue note, .llm-wiki/config.json) →
+#     MAI toccati.
+#   - Migrazioni: wiki/lint-report.md legacy viene spostato in _notes/lint/.
 #   - Backup della machinery sovrascritta: solo se la vault target NON è un repo
 #     git (in .llm-wiki/backups/<timestamp>/). Su repo git si usa il diff git.
 
@@ -29,7 +34,7 @@ for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY=1 ;;
     -h|--help)
-      sed -n '2,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '2,23p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0 ;;
     -*) echo "✗ Opzione sconosciuta: $arg" >&2; exit 2 ;;
     *) TARGET="$arg" ;;
@@ -131,10 +136,49 @@ ensure_dir() {
   fi
 }
 
+# ensure_gitignore_patterns — appende al .gitignore del target i pattern dello
+# stato llm-wiki che mancano (merge non distruttivo: mai rimuove righe utente).
+ensure_gitignore_patterns() {
+  local gi="$TARGET/.gitignore"
+  local patterns=(
+    ".llm-wiki/queue/"
+    ".llm-wiki/ingest-cache.json"
+    ".llm-wiki/pending-merges.json"
+    ".llm-wiki/review/"
+    ".llm-wiki/lint/"
+    ".llm-wiki/secrets.json"
+    ".qmd/"
+    "__pycache__/"
+  )
+  local missing=()
+  for p in "${patterns[@]}"; do
+    grep -qxF "$p" "$gi" 2>/dev/null || missing+=("$p")
+  done
+  [ ${#missing[@]} -eq 0 ] && return 0
+  echo "→ ${PREFIX}.gitignore: aggiungo ${#missing[@]} pattern llm-wiki mancanti"
+  if [ "$DRY" -eq 0 ]; then
+    {
+      [ -s "$gi" ] && echo ""
+      echo "# llm-wiki state (aggiunto da install-into-vault.sh)"
+      printf '%s\n' "${missing[@]}"
+    } >> "$gi"
+  fi
+}
+
 # ── 1. Machinery: skill, commands, scripts ────────────────────────────────────
 sync_dir ".claude/skills"
 sync_dir ".claude/commands"
 sync_dir "_system/scripts"
+
+# ── 1b. Machinery .llm-wiki: config template + doc stato interno ──────────────
+# config.example.json è richiesto da init-vault.sh (lo copia in config.json se
+# manca); README.md documenta code pending/lint history. Il config.json del
+# target (override utente) non viene MAI toccato.
+copy_file ".llm-wiki/config.example.json"
+copy_file ".llm-wiki/README.md"
+
+# ── 1c. .gitignore: merge dei pattern di stato (solo aggiunte) ────────────────
+ensure_gitignore_patterns
 
 # ── 2. Plugin Obsidian ────────────────────────────────────────────────────────
 PLUGIN_REL=".obsidian/plugins/llm-wiki-control"
@@ -179,6 +223,29 @@ for d in wiki/entities wiki/concepts wiki/sources wiki/queries wiki/synthesis \
          raw/sources _inbox/clippings; do
   ensure_dir "$d"
 done
+
+# ── 4b. Migrazione: report lint legacy fuori dalla wiki ───────────────────────
+# Le versioni precedenti salvavano il report in wiki/lint-report.md, che finiva
+# nell'indice QMD e veniva flaggato dal lint stesso. Nuova posizione: _notes/lint/.
+if [ -f "$TARGET/wiki/lint-report.md" ]; then
+  echo "→ ${PREFIX}migro report lint legacy: wiki/lint-report.md → _notes/lint/lint-report.md"
+  if [ "$DRY" -eq 0 ]; then
+    mkdir -p "$TARGET/_notes/lint"
+    if [ -f "$TARGET/_notes/lint/lint-report.md" ]; then
+      mv "$TARGET/wiki/lint-report.md" "$TARGET/_notes/lint/lint-report-legacy-$TS.md"
+    else
+      mv "$TARGET/wiki/lint-report.md" "$TARGET/_notes/lint/lint-report.md"
+    fi
+  fi
+fi
+
+# ── 4c. Avvisi su contenuti per-vault (mai modificati dallo script) ───────────
+# schema.md è per-vault: se non documenta lint_ignore, segnala (non tocca).
+if [ -f "$TARGET/schema.md" ] && ! grep -q "lint_ignore" "$TARGET/schema.md"; then
+  echo "→ ${PREFIX}nota: schema.md del target non documenta \`lint_ignore\` (soppressione"
+  echo "    lint per-pagina). Copia la sezione 'Soppressione lint per-pagina' da"
+  echo "    $SOURCE_ROOT/schema.md se vuoi documentarla (la feature funziona comunque)."
+fi
 
 # ── 5. QMD + secrets via init-vault.sh (ora aggiornato a qmd 2.5.2) ───────────
 # init-vault.sh è idempotente: crea .qmd/ (qmd init), aggiunge la collection
