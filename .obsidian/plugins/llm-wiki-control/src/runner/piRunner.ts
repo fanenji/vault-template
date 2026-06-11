@@ -4,6 +4,18 @@ import * as path from "path";
 import { normalizeRawEvent, StreamEvent } from "./events";
 import type { LlmWikiSettings } from "../settings";
 
+// Summary del lint deterministico (riga JSON su stdout di lint.py con
+// --report-file). new/new_warnings/resolved sono null al primo run (nessuno
+// storico con cui fare il diff).
+export interface LintSummary {
+  total_pages: number;
+  warnings: number;
+  info: number;
+  new: number | null;
+  new_warnings: number | null;
+  resolved: number | null;
+}
+
 export interface RunSkillOptions {
   // Nome cartella skill sotto .claude/skills/ (es. "wiki-query")
   skill: string;
@@ -180,6 +192,73 @@ export class PiRunner {
         }
         opts.onEvent({ kind: "exit", code });
         resolve(code);
+      });
+    });
+  }
+
+  // Esegue il lint deterministico (script Python, nessun LLM): scrive il
+  // report in _notes/lint/lint-report.md e ritorna il summary parsato dallo
+  // stdout. Condivide il mutex delle skill (muta .llm-wiki/lint e il report).
+  // Exit code 1 = warning presenti (non è un errore); ≥2 o spawn failure → throw.
+  runDeterministicLint(timeoutMs = 10 * 60_000): Promise<LintSummary | null> {
+    if (this.skillRunning) {
+      return Promise.reject(new Error("Un'altra operazione è già in corso"));
+    }
+    const script = path.join(
+      this.vaultRoot, ".claude", "skills", "wiki-lint", "scripts", "lint.py"
+    );
+    const args = [script, "--report-file", "_notes/lint/lint-report.md"];
+
+    return new Promise((resolve, reject) => {
+      let child: ChildProcessWithoutNullStreams;
+      try {
+        child = spawn("python3", args, {
+          cwd: this.vaultRoot,
+          env: buildEnv(),
+          detached: process.platform !== "win32",
+        });
+      } catch (err) {
+        reject(err);
+        return;
+      }
+      this.skillRunning = true;
+      this.children.add(child);
+      child.stdin.end();
+
+      const timer = setTimeout(() => killTree(child), timeoutMs);
+
+      let out = "";
+      let err = "";
+      child.stdout.on("data", (d: Buffer) => (out += d.toString()));
+      child.stderr.on("data", (d: Buffer) => (err += d.toString()));
+      child.on("error", (e) => {
+        clearTimeout(timer);
+        this.children.delete(child);
+        this.skillRunning = false;
+        reject(e);
+      });
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        this.children.delete(child);
+        this.skillRunning = false;
+        if (code !== 0 && code !== 1) {
+          reject(new Error(err.trim() || `lint.py exit ${code}`));
+          return;
+        }
+        // Ultima riga JSON dello stdout = summary.
+        const lines = out.split("\n").map((l) => l.trim()).filter(Boolean);
+        for (let i = lines.length - 1; i >= 0; i--) {
+          try {
+            const parsed = JSON.parse(lines[i]);
+            if (parsed && typeof parsed === "object" && "warnings" in parsed) {
+              resolve(parsed as LintSummary);
+              return;
+            }
+          } catch {
+            /* riga non JSON: continua a risalire */
+          }
+        }
+        resolve(null);
       });
     });
   }

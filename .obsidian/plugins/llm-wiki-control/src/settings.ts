@@ -216,8 +216,9 @@ export class LlmWikiSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Lint automatico")
       .setDesc(
-        "Esegui periodicamente wiki-lint in background (senza --fix) e salva il " +
-          "report in _notes/lint/lint-report.md."
+        "Esegue periodicamente il lint deterministico (script, senza LLM) e salva " +
+          "il report in _notes/lint/lint-report.md. Il check semantico via pi parte " +
+          "solo se compaiono warning nuovi rispetto al run precedente."
       )
       .addToggle((t) =>
         t.setValue(this.plugin.settings.lintScheduleEnabled).onChange(async (v) => {

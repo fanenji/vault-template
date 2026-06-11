@@ -150,7 +150,9 @@ export class ResearchPanel {
     this.log.endRun(code);
     this.running = false;
     this.textarea.value = "";
-    // Aggiorna lo storico (nuova sessione creata da pi).
-    setTimeout(() => void this.refreshHistory(), 500);
+    // Aggiorna lo storico (nuova sessione creata da pi): subito, con un
+    // retry dopo 2s nel caso il file di sessione non sia ancora flushato.
+    await this.refreshHistory();
+    setTimeout(() => void this.refreshHistory(), 2000);
   }
 }

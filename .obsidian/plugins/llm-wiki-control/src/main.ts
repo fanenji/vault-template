@@ -4,7 +4,7 @@ import {
   LlmWikiSettings,
   LlmWikiSettingTab,
 } from "./settings";
-import { PiRunner } from "./runner/piRunner";
+import { PiRunner, LintSummary } from "./runner/piRunner";
 import { SessionStore } from "./sessions/sessionStore";
 import { ControlView, VIEW_TYPE_LLM_WIKI } from "./view/ControlView";
 
@@ -122,42 +122,79 @@ export default class LlmWikiControlPlugin extends Plugin {
     await this.runScheduledLint();
   }
 
-  // Esegue wiki-lint in background (no --fix), salva il report e notifica.
-  // Timeout di sicurezza a 30 minuti: un processo pi bloccato non deve tenere
-  // occupato il flag (e quindi saltare tutti i run successivi) per sempre.
+  // Lint schedulato in due fasi:
+  //   1. Lint deterministico via script (gratis, secondi, nessun LLM): scrive
+  //      il report e ritorna il summary col diff vs run precedente.
+  //   2. Solo se il diff segnala WARNING NUOVI, escalation alla skill completa
+  //      via pi (check semantico + triage LLM). Il primo run (nessuno storico)
+  //      è la baseline: niente escalation.
+  // Prima la schedulazione lanciava una sessione LLM piena a ogni run, anche
+  // quando non era cambiato nulla.
   private async runScheduledLint(): Promise<void> {
     if (this.scheduledLintRunning || !this.runner) return;
     this.scheduledLintRunning = true;
     this.settings.lintLastRunAt = Date.now();
     await this.saveSettings();
 
-    const ac = new AbortController();
-    const timeoutMs = 30 * 60_000;
-    const timeout = window.setTimeout(() => ac.abort(), timeoutMs);
-
-    new Notice("LLM Wiki: avvio lint schedulato…");
     try {
-      const code = await this.runner.runSkill({
-        skill: "wiki-lint",
-        prompt:
-          "[llm-wiki:lint] Esegui un audit della wiki con wiki-lint in modalità " +
-          "non interattiva (senza --fix). Salva il report in _notes/lint/lint-report.md.",
-        signal: ac.signal,
-        onEvent: () => {
-          /* run in background: nessun rendering */
-        },
-      });
-      if (ac.signal.aborted) {
-        new Notice("LLM Wiki: lint schedulato interrotto per timeout (30 min).");
-      } else if (code === 0 || code == null) {
-        new Notice("LLM Wiki: lint schedulato completato (_notes/lint/lint-report.md).");
-      } else {
-        new Notice(`LLM Wiki: lint schedulato uscito con code ${code}.`);
+      // ── Fase 1: deterministico ──────────────────────────────────────────
+      let summary: LintSummary | null;
+      try {
+        summary = await this.runner.runDeterministicLint();
+      } catch (e) {
+        new Notice(`LLM Wiki: lint schedulato fallito — ${String(e)}`);
+        return;
       }
-    } catch (e) {
-      new Notice(`LLM Wiki: lint schedulato fallito — ${String(e)}`);
+
+      if (!summary) {
+        new Notice("LLM Wiki: lint completato (summary non disponibile) — vedi _notes/lint/lint-report.md.");
+        return;
+      }
+
+      const diffPart =
+        summary.new != null
+          ? `${summary.new} nuove, ${summary.resolved} risolte — `
+          : "";
+      new Notice(
+        `LLM Wiki lint: ${diffPart}${summary.warnings} warning, ${summary.info} info ` +
+          `(_notes/lint/lint-report.md).`
+      );
+
+      // ── Fase 2: escalation LLM solo su warning nuovi ────────────────────
+      if (!summary.new_warnings || summary.new_warnings <= 0) return;
+
+      const ac = new AbortController();
+      const timeout = window.setTimeout(() => ac.abort(), 30 * 60_000);
+      new Notice(
+        `LLM Wiki: ${summary.new_warnings} warning nuovi — avvio check semantico LLM…`
+      );
+      try {
+        const code = await this.runner.runSkill({
+          skill: "wiki-lint",
+          prompt:
+            "[llm-wiki:lint] Il lint deterministico ha appena trovato " +
+            `${summary.new_warnings} warning nuovi (report in _notes/lint/lint-report.md). ` +
+            "Esegui lo Step 2 della skill wiki-lint (check semantico: coppie simili + " +
+            "campione a rotazione) in modalità non interattiva (senza --fix), e appendi " +
+            "le issue semantiche al report.",
+          signal: ac.signal,
+          onEvent: () => {
+            /* run in background: nessun rendering */
+          },
+        });
+        if (ac.signal.aborted) {
+          new Notice("LLM Wiki: check semantico interrotto per timeout (30 min).");
+        } else if (code === 0 || code == null) {
+          new Notice("LLM Wiki: check semantico completato (_notes/lint/lint-report.md).");
+        } else {
+          new Notice(`LLM Wiki: check semantico uscito con code ${code}.`);
+        }
+      } catch (e) {
+        new Notice(`LLM Wiki: check semantico fallito — ${String(e)}`);
+      } finally {
+        window.clearTimeout(timeout);
+      }
     } finally {
-      window.clearTimeout(timeout);
       this.scheduledLintRunning = false;
     }
   }

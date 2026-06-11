@@ -15,13 +15,15 @@ Plugin **desktop-only** (usa `child_process` per lanciare `pi`).
 - Tab **DeepResearch**: argomento → `deep-research` (Tavily/DuckDuckGo), streaming
   con `[[wikilink]]` + cross-ref, storico, toggle **Auto-ingest** (Step 8).
 - Tab **Ingest**: seleziona un file (o l'intera cartella `_inbox/clippings`) →
-  `wiki-ingest`. Avviso costo token per batch > 5 file (regola di `CLAUDE.md`).
+  `wiki-ingest`. Avviso costo token per batch > 5 file (regola di `AGENTS.md`).
 - Tab **Lint**: esegue `wiki-lint` (audit) con checkbox `--fix`; report in
   `_notes/lint/lint-report.md`.
 - Settings: percorso di `pi`, provider/model (dropdown da `pi --list-models`),
   cartella ingest, **Tavily API key** (→ `.llm-wiki/secrets.json`), toggle
   "mostra thinking" e "mostra i comandi eseguiti", **schedulazione lint**
-  (lint automatico periodico in background).
+  (lint automatico periodico: script deterministico senza LLM, con report e diff;
+  il check semantico via pi parte solo se compaiono warning nuovi. Il run
+  scaduto parte anche all'avvio di Obsidian).
 
 ## Build
 

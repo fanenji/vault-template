@@ -177,7 +177,7 @@ var _LlmWikiSettingTab = class _LlmWikiSettingTab extends import_obsidian.Plugin
     );
     new import_obsidian.Setting(containerEl).setName("Schedulazione lint").setHeading();
     new import_obsidian.Setting(containerEl).setName("Lint automatico").setDesc(
-      "Esegui periodicamente wiki-lint in background (senza --fix) e salva il report in _notes/lint/lint-report.md."
+      "Esegue periodicamente il lint deterministico (script, senza LLM) e salva il report in _notes/lint/lint-report.md. Il check semantico via pi parte solo se compaiono warning nuovi rispetto al run precedente."
     ).addToggle(
       (t) => t.setValue(this.plugin.settings.lintScheduleEnabled).onChange(async (v) => {
         this.plugin.settings.lintScheduleEnabled = v;
@@ -423,6 +423,72 @@ var PiRunner = class {
         }
         opts.onEvent({ kind: "exit", code });
         resolve(code);
+      });
+    });
+  }
+  // Esegue il lint deterministico (script Python, nessun LLM): scrive il
+  // report in _notes/lint/lint-report.md e ritorna il summary parsato dallo
+  // stdout. Condivide il mutex delle skill (muta .llm-wiki/lint e il report).
+  // Exit code 1 = warning presenti (non è un errore); ≥2 o spawn failure → throw.
+  runDeterministicLint(timeoutMs = 10 * 6e4) {
+    if (this.skillRunning) {
+      return Promise.reject(new Error("Un'altra operazione \xE8 gi\xE0 in corso"));
+    }
+    const script = path.join(
+      this.vaultRoot,
+      ".claude",
+      "skills",
+      "wiki-lint",
+      "scripts",
+      "lint.py"
+    );
+    const args = [script, "--report-file", "_notes/lint/lint-report.md"];
+    return new Promise((resolve, reject) => {
+      let child;
+      try {
+        child = (0, import_child_process.spawn)("python3", args, {
+          cwd: this.vaultRoot,
+          env: buildEnv(),
+          detached: process.platform !== "win32"
+        });
+      } catch (err2) {
+        reject(err2);
+        return;
+      }
+      this.skillRunning = true;
+      this.children.add(child);
+      child.stdin.end();
+      const timer = setTimeout(() => killTree(child), timeoutMs);
+      let out = "";
+      let err = "";
+      child.stdout.on("data", (d) => out += d.toString());
+      child.stderr.on("data", (d) => err += d.toString());
+      child.on("error", (e) => {
+        clearTimeout(timer);
+        this.children.delete(child);
+        this.skillRunning = false;
+        reject(e);
+      });
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        this.children.delete(child);
+        this.skillRunning = false;
+        if (code !== 0 && code !== 1) {
+          reject(new Error(err.trim() || `lint.py exit ${code}`));
+          return;
+        }
+        const lines = out.split("\n").map((l) => l.trim()).filter(Boolean);
+        for (let i = lines.length - 1; i >= 0; i--) {
+          try {
+            const parsed = JSON.parse(lines[i]);
+            if (parsed && typeof parsed === "object" && "warnings" in parsed) {
+              resolve(parsed);
+              return;
+            }
+          } catch {
+          }
+        }
+        resolve(null);
       });
     });
   }
@@ -748,13 +814,6 @@ var StreamLog = class {
           row.createSpan({ cls: "llm-wiki-tool-detail", text: ev.detail });
         break;
       }
-      case "result": {
-        this.currentTextEl = null;
-        if (ev.text) {
-          this.logEl.createDiv({ cls: "llm-wiki-ev-result", text: ev.text });
-        }
-        break;
-      }
       case "error": {
         this.currentTextEl = null;
         this.logEl.createDiv({ cls: "llm-wiki-ev-error", text: ev.message });
@@ -789,6 +848,34 @@ var StreamLog = class {
 
 // src/view/IngestPanel.ts
 var BATCH_WARN_THRESHOLD = 5;
+var ConfirmModal = class extends import_obsidian2.Modal {
+  constructor(app, message, resolve) {
+    super(app);
+    this.settled = false;
+    this.message = message;
+    this.resolve = resolve;
+  }
+  onOpen() {
+    this.contentEl.createEl("p", { text: this.message });
+    const row = this.contentEl.createDiv({ cls: "modal-button-container" });
+    const okBtn = row.createEl("button", { text: "Procedi", cls: "mod-cta" });
+    okBtn.onclick = () => {
+      this.settled = true;
+      this.resolve(true);
+      this.close();
+    };
+    const cancelBtn = row.createEl("button", { text: "Annulla" });
+    cancelBtn.onclick = () => this.close();
+  }
+  onClose() {
+    this.contentEl.empty();
+    if (!this.settled)
+      this.resolve(false);
+  }
+};
+function confirmModal(app, message) {
+  return new Promise((resolve) => new ConfirmModal(app, message, resolve).open());
+}
 var IngestPanel = class {
   constructor(parent, app, runner, getSettings) {
     this.running = false;
@@ -851,7 +938,8 @@ var IngestPanel = class {
       count = 1;
     }
     if (count > BATCH_WARN_THRESHOLD) {
-      const ok = window.confirm(
+      const ok = await confirmModal(
+        this.app,
         `Stai per ingerire ${count} file. L'operazione consuma token in modo proporzionale al numero/dimensione dei documenti. Procedere?`
       );
       if (!ok)
@@ -992,7 +1080,8 @@ var QueryPanel = class {
     this.log.endRun(code);
     this.running = false;
     this.textarea.value = "";
-    setTimeout(() => void this.refreshHistory(), 500);
+    await this.refreshHistory();
+    setTimeout(() => void this.refreshHistory(), 2e3);
   }
 };
 
@@ -1109,7 +1198,8 @@ var ResearchPanel = class {
     this.log.endRun(code);
     this.running = false;
     this.textarea.value = "";
-    setTimeout(() => void this.refreshHistory(), 500);
+    await this.refreshHistory();
+    setTimeout(() => void this.refreshHistory(), 2e3);
   }
 };
 
@@ -1335,38 +1425,64 @@ var LlmWikiControlPlugin = class extends import_obsidian7.Plugin {
       return;
     await this.runScheduledLint();
   }
-  // Esegue wiki-lint in background (no --fix), salva il report e notifica.
-  // Timeout di sicurezza a 30 minuti: un processo pi bloccato non deve tenere
-  // occupato il flag (e quindi saltare tutti i run successivi) per sempre.
+  // Lint schedulato in due fasi:
+  //   1. Lint deterministico via script (gratis, secondi, nessun LLM): scrive
+  //      il report e ritorna il summary col diff vs run precedente.
+  //   2. Solo se il diff segnala WARNING NUOVI, escalation alla skill completa
+  //      via pi (check semantico + triage LLM). Il primo run (nessuno storico)
+  //      è la baseline: niente escalation.
+  // Prima la schedulazione lanciava una sessione LLM piena a ogni run, anche
+  // quando non era cambiato nulla.
   async runScheduledLint() {
     if (this.scheduledLintRunning || !this.runner)
       return;
     this.scheduledLintRunning = true;
     this.settings.lintLastRunAt = Date.now();
     await this.saveSettings();
-    const ac = new AbortController();
-    const timeoutMs = 30 * 6e4;
-    const timeout = window.setTimeout(() => ac.abort(), timeoutMs);
-    new import_obsidian7.Notice("LLM Wiki: avvio lint schedulato\u2026");
     try {
-      const code = await this.runner.runSkill({
-        skill: "wiki-lint",
-        prompt: "[llm-wiki:lint] Esegui un audit della wiki con wiki-lint in modalit\xE0 non interattiva (senza --fix). Salva il report in _notes/lint/lint-report.md.",
-        signal: ac.signal,
-        onEvent: () => {
-        }
-      });
-      if (ac.signal.aborted) {
-        new import_obsidian7.Notice("LLM Wiki: lint schedulato interrotto per timeout (30 min).");
-      } else if (code === 0 || code == null) {
-        new import_obsidian7.Notice("LLM Wiki: lint schedulato completato (_notes/lint/lint-report.md).");
-      } else {
-        new import_obsidian7.Notice(`LLM Wiki: lint schedulato uscito con code ${code}.`);
+      let summary;
+      try {
+        summary = await this.runner.runDeterministicLint();
+      } catch (e) {
+        new import_obsidian7.Notice(`LLM Wiki: lint schedulato fallito \u2014 ${String(e)}`);
+        return;
       }
-    } catch (e) {
-      new import_obsidian7.Notice(`LLM Wiki: lint schedulato fallito \u2014 ${String(e)}`);
+      if (!summary) {
+        new import_obsidian7.Notice("LLM Wiki: lint completato (summary non disponibile) \u2014 vedi _notes/lint/lint-report.md.");
+        return;
+      }
+      const diffPart = summary.new != null ? `${summary.new} nuove, ${summary.resolved} risolte \u2014 ` : "";
+      new import_obsidian7.Notice(
+        `LLM Wiki lint: ${diffPart}${summary.warnings} warning, ${summary.info} info (_notes/lint/lint-report.md).`
+      );
+      if (!summary.new_warnings || summary.new_warnings <= 0)
+        return;
+      const ac = new AbortController();
+      const timeout = window.setTimeout(() => ac.abort(), 30 * 6e4);
+      new import_obsidian7.Notice(
+        `LLM Wiki: ${summary.new_warnings} warning nuovi \u2014 avvio check semantico LLM\u2026`
+      );
+      try {
+        const code = await this.runner.runSkill({
+          skill: "wiki-lint",
+          prompt: `[llm-wiki:lint] Il lint deterministico ha appena trovato ${summary.new_warnings} warning nuovi (report in _notes/lint/lint-report.md). Esegui lo Step 2 della skill wiki-lint (check semantico: coppie simili + campione a rotazione) in modalit\xE0 non interattiva (senza --fix), e appendi le issue semantiche al report.`,
+          signal: ac.signal,
+          onEvent: () => {
+          }
+        });
+        if (ac.signal.aborted) {
+          new import_obsidian7.Notice("LLM Wiki: check semantico interrotto per timeout (30 min).");
+        } else if (code === 0 || code == null) {
+          new import_obsidian7.Notice("LLM Wiki: check semantico completato (_notes/lint/lint-report.md).");
+        } else {
+          new import_obsidian7.Notice(`LLM Wiki: check semantico uscito con code ${code}.`);
+        }
+      } catch (e) {
+        new import_obsidian7.Notice(`LLM Wiki: check semantico fallito \u2014 ${String(e)}`);
+      } finally {
+        window.clearTimeout(timeout);
+      }
     } finally {
-      window.clearTimeout(timeout);
       this.scheduledLintRunning = false;
     }
   }

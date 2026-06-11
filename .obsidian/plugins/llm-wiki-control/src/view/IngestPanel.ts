@@ -1,9 +1,44 @@
-import { App, Notice, TFile } from "obsidian";
+import { App, Modal, Notice, TFile } from "obsidian";
 import { StreamLog } from "./StreamLog";
 import { PiRunner } from "../runner/piRunner";
 import type { LlmWikiSettings } from "../settings";
 
-const BATCH_WARN_THRESHOLD = 5; // da CLAUDE.md: batch >5 file → avviso costo token
+const BATCH_WARN_THRESHOLD = 5; // da AGENTS.md: batch >5 file → avviso costo token
+
+// Modal di conferma (sostituisce window.confirm: coerente con la UI Obsidian).
+class ConfirmModal extends Modal {
+  private message: string;
+  private resolve: (ok: boolean) => void;
+  private settled = false;
+
+  constructor(app: App, message: string, resolve: (ok: boolean) => void) {
+    super(app);
+    this.message = message;
+    this.resolve = resolve;
+  }
+
+  onOpen(): void {
+    this.contentEl.createEl("p", { text: this.message });
+    const row = this.contentEl.createDiv({ cls: "modal-button-container" });
+    const okBtn = row.createEl("button", { text: "Procedi", cls: "mod-cta" });
+    okBtn.onclick = () => {
+      this.settled = true;
+      this.resolve(true);
+      this.close();
+    };
+    const cancelBtn = row.createEl("button", { text: "Annulla" });
+    cancelBtn.onclick = () => this.close();
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+    if (!this.settled) this.resolve(false); // chiusura con X/Esc = annulla
+  }
+}
+
+function confirmModal(app: App, message: string): Promise<boolean> {
+  return new Promise((resolve) => new ConfirmModal(app, message, resolve).open());
+}
 
 export class IngestPanel {
   private app: App;
@@ -92,9 +127,10 @@ export class IngestPanel {
       count = 1;
     }
 
-    // Avviso costo token per batch grossi (regola CLAUDE.md).
+    // Avviso costo token per batch grossi (regola AGENTS.md).
     if (count > BATCH_WARN_THRESHOLD) {
-      const ok = window.confirm(
+      const ok = await confirmModal(
+        this.app,
         `Stai per ingerire ${count} file. L'operazione consuma token in modo ` +
           `proporzionale al numero/dimensione dei documenti. Procedere?`
       );

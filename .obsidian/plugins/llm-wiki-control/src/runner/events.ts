@@ -32,7 +32,6 @@ export type StreamEvent =
   | { kind: "text"; text: string }
   | { kind: "thinking"; text: string }
   | { kind: "toolCall"; name: string; detail?: string }
-  | { kind: "result"; text?: string }
   | { kind: "error"; message: string }
   | { kind: "exit"; code: number | null };
 

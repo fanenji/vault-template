@@ -814,6 +814,25 @@ def render_json(results: list[LintResult]) -> str:
     return json.dumps([asdict(r) for r in results], indent=2, ensure_ascii=False)
 
 
+def build_summary(results: list[LintResult], total_pages: int,
+                  diff: Optional[dict]) -> dict:
+    """Summary compatto del run (una riga JSON su stdout con --report-file)."""
+    summary = {
+        "total_pages": total_pages,
+        "warnings": sum(1 for r in results if r.severity == "warning"),
+        "info": sum(1 for r in results if r.severity == "info"),
+        "new": None,
+        "new_warnings": None,
+        "resolved": None,
+    }
+    if diff and diff.get("previous_ts"):
+        new = diff.get("new", [])
+        summary["new"] = len(new)
+        summary["new_warnings"] = sum(1 for r in new if r.severity == "warning")
+        summary["resolved"] = len(diff.get("resolved", []))
+    return summary
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def find_vault_root(start: Path) -> Path:
@@ -925,6 +944,9 @@ def main() -> int:
         args.report_file.parent.mkdir(parents=True, exist_ok=True)
         args.report_file.write_text(out, encoding="utf-8")
         print(f"✓ Report scritto in {args.report_file}", file=sys.stderr)
+        # Summary machine-readable su stdout: consumato dal plugin Obsidian
+        # (lint schedulato) per la Notice e per decidere l'escalation LLM.
+        print(json.dumps(build_summary(results, len(pages), diff), ensure_ascii=False))
     else:
         print(out)
 

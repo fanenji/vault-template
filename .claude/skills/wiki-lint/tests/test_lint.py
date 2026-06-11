@@ -238,6 +238,27 @@ class TestHistoryDiff(LintVaultTestCase):
         self.assertEqual(second[0].status, "persistent")
         self.assertEqual(second[1].status, "new")
 
+    def test_build_summary(self):
+        first = [self._result("entities/a.md")]
+        lint.save_run(self.vault, first, 1)
+        second = [
+            lint.LintResult(type="broken-link", severity="warning",
+                            page="entities/c.md", detail="x"),
+            self._result("entities/a.md"),
+        ]
+        diff = lint.diff_results(second, lint.load_previous_run(self.vault))
+        s = lint.build_summary(second, total_pages=2, diff=diff)
+        self.assertEqual(s["warnings"], 1)
+        self.assertEqual(s["info"], 1)
+        self.assertEqual(s["new"], 1)
+        self.assertEqual(s["new_warnings"], 1)
+        self.assertEqual(s["resolved"], 0)
+
+    def test_build_summary_without_history(self):
+        s = lint.build_summary([self._result()], total_pages=1, diff=None)
+        self.assertIsNone(s["new"])
+        self.assertEqual(s["info"], 1)
+
     def test_report_renders_diff_sections(self):
         first = [self._result("entities/a.md")]
         lint.save_run(self.vault, first, 1)

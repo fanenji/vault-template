@@ -100,13 +100,6 @@ export class StreamLog {
         if (ev.detail) row.createSpan({ cls: "llm-wiki-tool-detail", text: ev.detail });
         break;
       }
-      case "result": {
-        this.currentTextEl = null;
-        if (ev.text) {
-          this.logEl.createDiv({ cls: "llm-wiki-ev-result", text: ev.text });
-        }
-        break;
-      }
       case "error": {
         this.currentTextEl = null;
         this.logEl.createDiv({ cls: "llm-wiki-ev-error", text: ev.message });

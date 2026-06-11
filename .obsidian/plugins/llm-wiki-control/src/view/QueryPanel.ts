@@ -95,7 +95,7 @@ export class QueryPanel {
     try {
       const events = await this.store.loadSession(s.file);
       this.log.setShowThinking(this.getSettings().showThinking);
-    this.log.setShowToolCalls(this.getSettings().showToolCalls);
+      this.log.setShowToolCalls(this.getSettings().showToolCalls);
       this.log.renderHistory(events);
       new Notice("Sessione caricata — usa Follow-up per continuare");
     } catch (e) {
@@ -144,7 +144,9 @@ export class QueryPanel {
     this.log.endRun(code);
     this.running = false;
     this.textarea.value = "";
-    // Aggiorna lo storico (nuova sessione creata da pi).
-    setTimeout(() => void this.refreshHistory(), 500);
+    // Aggiorna lo storico (nuova sessione creata da pi): subito, con un
+    // retry dopo 2s nel caso il file di sessione non sia ancora flushato.
+    await this.refreshHistory();
+    setTimeout(() => void this.refreshHistory(), 2000);
   }
 }
