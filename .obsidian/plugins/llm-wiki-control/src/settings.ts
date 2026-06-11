@@ -8,9 +8,12 @@ export interface LlmWikiSettings {
   defaultIngestDir: string;
   showThinking: boolean;
   showToolCalls: boolean;
-  // Predisposti per l'iterazione 2 (schedulazione lint) — non usati in v1.
+  // Schedulazione lint (vedi main.ts setupLintSchedule).
   lintScheduleEnabled: boolean;
   lintIntervalMinutes: number;
+  // Epoch ms dell'ultimo run schedulato: persistito così un run scaduto
+  // parte anche dopo un riavvio di Obsidian.
+  lintLastRunAt: number;
 }
 
 export const DEFAULT_SETTINGS: LlmWikiSettings = {
@@ -22,6 +25,7 @@ export const DEFAULT_SETTINGS: LlmWikiSettings = {
   showToolCalls: false,
   lintScheduleEnabled: false,
   lintIntervalMinutes: 1440,
+  lintLastRunAt: 0,
 };
 
 export class LlmWikiSettingTab extends PluginSettingTab {
@@ -225,7 +229,10 @@ export class LlmWikiSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Intervallo (minuti)")
-      .setDesc("Minimo 5. Default 1440 (giornaliero).")
+      .setDesc(
+        "Minimo 5. Default 1440 (giornaliero). Il run parte anche all'avvio di " +
+          "Obsidian se l'ultimo è più vecchio dell'intervallo."
+      )
       .addText((t) =>
         t
           .setValue(String(this.plugin.settings.lintIntervalMinutes))

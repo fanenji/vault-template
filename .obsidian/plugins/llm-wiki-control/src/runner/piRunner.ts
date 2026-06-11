@@ -25,9 +25,34 @@ function buildEnv(): NodeJS.ProcessEnv {
   return { ...process.env, PATH: merged };
 }
 
+// Termina il child e tutti i suoi discendenti (python, qmd, …). Su POSIX i
+// child vengono spawnati detached → nuovo process group → kill(-pid) raggiunge
+// l'intero albero. Su Windows fallback al kill del solo processo.
+function killTree(child: ChildProcessWithoutNullStreams): void {
+  if (process.platform !== "win32" && child.pid) {
+    try {
+      process.kill(-child.pid, "SIGTERM");
+      return;
+    } catch {
+      /* process group già terminato o non disponibile: fallback sotto */
+    }
+  }
+  try {
+    child.kill("SIGTERM");
+  } catch {
+    /* già terminato */
+  }
+}
+
 export class PiRunner {
   private vaultRoot: string;
   private settings: LlmWikiSettings;
+  // Tutti i child vivi (skill + list-models): permette killAll() all'unload.
+  private children = new Set<ChildProcessWithoutNullStreams>();
+  // Mutex globale: una sola skill alla volta. Le skill mutano wiki/, lo stato
+  // .llm-wiki/ e l'indice QMD: run concorrenti (anche da pannelli diversi o
+  // dal lint schedulato) si corromperebbero a vicenda.
+  private skillRunning = false;
 
   constructor(vaultRoot: string, settings: LlmWikiSettings) {
     this.vaultRoot = vaultRoot;
@@ -36,6 +61,17 @@ export class PiRunner {
 
   updateSettings(settings: LlmWikiSettings): void {
     this.settings = settings;
+  }
+
+  // True se una skill è in esecuzione (usato dai pannelli e dal lint schedulato).
+  isBusy(): boolean {
+    return this.skillRunning;
+  }
+
+  // Termina tutti i processi vivi (chiamato all'unload del plugin).
+  killAll(): void {
+    for (const child of this.children) killTree(child);
+    this.children.clear();
   }
 
   private skillPath(skill: string): string {
@@ -59,6 +95,17 @@ export class PiRunner {
   // Lancia una skill in headless e inoltra gli eventi normalizzati via onEvent.
   // Risolve quando il processo termina (qualsiasi exit code).
   runSkill(opts: RunSkillOptions): Promise<number | null> {
+    // Mutex: rifiuta subito se un'altra skill è in corso (vedi commento sul campo).
+    if (this.skillRunning) {
+      opts.onEvent({
+        kind: "error",
+        message:
+          "Un'altra operazione LLM è già in corso in questa vault — attendi che finisca.",
+      });
+      opts.onEvent({ kind: "exit", code: 1 });
+      return Promise.resolve(1);
+    }
+
     const args = this.buildArgs(opts);
     const piPath = this.settings.piPath || "pi";
 
@@ -68,6 +115,9 @@ export class PiRunner {
         child = spawn(piPath, args, {
           cwd: this.vaultRoot,
           env: buildEnv(),
+          // POSIX: nuovo process group, così lo Stop termina anche i processi
+          // figli della skill (python, qmd) e non solo pi. Vedi killTree().
+          detached: process.platform !== "win32",
         });
       } catch (err) {
         opts.onEvent({
@@ -78,6 +128,8 @@ export class PiRunner {
         resolve(1);
         return;
       }
+      this.skillRunning = true;
+      this.children.add(child);
 
       // Chiudi subito stdin: con `pi -p` non passiamo input, ma se lo stdin del
       // child resta una pipe aperta pi resta in attesa di EOF e non emette nulla
@@ -85,7 +137,7 @@ export class PiRunner {
       // sotto Electron). end() invia EOF immediato e pi parte.
       child.stdin.end();
 
-      const onAbort = () => child.kill("SIGTERM");
+      const onAbort = () => killTree(child);
       if (opts.signal) {
         if (opts.signal.aborted) onAbort();
         else opts.signal.addEventListener("abort", onAbort, { once: true });
@@ -120,6 +172,8 @@ export class PiRunner {
 
       child.on("close", (code) => {
         rl.close();
+        this.children.delete(child);
+        this.skillRunning = false;
         if (opts.signal) opts.signal.removeEventListener("abort", onAbort);
         if (code !== 0 && stderrBuf.trim()) {
           opts.onEvent({ kind: "error", message: stderrBuf.trim() });
@@ -143,11 +197,13 @@ export class PiRunner {
         reject(e);
         return;
       }
+      this.children.add(child);
       child.stdin.end(); // EOF immediato: evita che pi resti in attesa di stdin
       child.stdout.on("data", (d: Buffer) => (out += d.toString()));
       child.stderr.on("data", (d: Buffer) => (err += d.toString()));
       child.on("error", reject);
       child.on("close", (code) => {
+        this.children.delete(child);
         if (code !== 0) {
           reject(new Error(err.trim() || `pi --list-models exit ${code}`));
           return;

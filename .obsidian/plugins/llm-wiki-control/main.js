@@ -45,7 +45,8 @@ var DEFAULT_SETTINGS = {
   showThinking: false,
   showToolCalls: false,
   lintScheduleEnabled: false,
-  lintIntervalMinutes: 1440
+  lintIntervalMinutes: 1440,
+  lintLastRunAt: 0
 };
 var _LlmWikiSettingTab = class _LlmWikiSettingTab extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
@@ -184,7 +185,9 @@ var _LlmWikiSettingTab = class _LlmWikiSettingTab extends import_obsidian.Plugin
         this.plugin.setupLintSchedule();
       })
     );
-    new import_obsidian.Setting(containerEl).setName("Intervallo (minuti)").setDesc("Minimo 5. Default 1440 (giornaliero).").addText(
+    new import_obsidian.Setting(containerEl).setName("Intervallo (minuti)").setDesc(
+      "Minimo 5. Default 1440 (giornaliero). Il run parte anche all'avvio di Obsidian se l'ultimo \xE8 pi\xF9 vecchio dell'intervallo."
+    ).addText(
       (t) => t.setValue(String(this.plugin.settings.lintIntervalMinutes)).onChange(async (v) => {
         const n = parseInt(v, 10);
         if (!Number.isNaN(n) && n > 0) {
@@ -287,13 +290,42 @@ function buildEnv() {
   const merged = [current, ...extra].filter(Boolean).join(path.delimiter);
   return { ...process.env, PATH: merged };
 }
+function killTree(child) {
+  if (process.platform !== "win32" && child.pid) {
+    try {
+      process.kill(-child.pid, "SIGTERM");
+      return;
+    } catch {
+    }
+  }
+  try {
+    child.kill("SIGTERM");
+  } catch {
+  }
+}
 var PiRunner = class {
   constructor(vaultRoot, settings) {
+    // Tutti i child vivi (skill + list-models): permette killAll() all'unload.
+    this.children = /* @__PURE__ */ new Set();
+    // Mutex globale: una sola skill alla volta. Le skill mutano wiki/, lo stato
+    // .llm-wiki/ e l'indice QMD: run concorrenti (anche da pannelli diversi o
+    // dal lint schedulato) si corromperebbero a vicenda.
+    this.skillRunning = false;
     this.vaultRoot = vaultRoot;
     this.settings = settings;
   }
   updateSettings(settings) {
     this.settings = settings;
+  }
+  // True se una skill è in esecuzione (usato dai pannelli e dal lint schedulato).
+  isBusy() {
+    return this.skillRunning;
+  }
+  // Termina tutti i processi vivi (chiamato all'unload del plugin).
+  killAll() {
+    for (const child of this.children)
+      killTree(child);
+    this.children.clear();
   }
   skillPath(skill) {
     return path.join(this.vaultRoot, ".claude", "skills", skill);
@@ -316,6 +348,14 @@ var PiRunner = class {
   // Lancia una skill in headless e inoltra gli eventi normalizzati via onEvent.
   // Risolve quando il processo termina (qualsiasi exit code).
   runSkill(opts) {
+    if (this.skillRunning) {
+      opts.onEvent({
+        kind: "error",
+        message: "Un'altra operazione LLM \xE8 gi\xE0 in corso in questa vault \u2014 attendi che finisca."
+      });
+      opts.onEvent({ kind: "exit", code: 1 });
+      return Promise.resolve(1);
+    }
     const args = this.buildArgs(opts);
     const piPath = this.settings.piPath || "pi";
     return new Promise((resolve) => {
@@ -323,7 +363,10 @@ var PiRunner = class {
       try {
         child = (0, import_child_process.spawn)(piPath, args, {
           cwd: this.vaultRoot,
-          env: buildEnv()
+          env: buildEnv(),
+          // POSIX: nuovo process group, così lo Stop termina anche i processi
+          // figli della skill (python, qmd) e non solo pi. Vedi killTree().
+          detached: process.platform !== "win32"
         });
       } catch (err) {
         opts.onEvent({
@@ -334,8 +377,10 @@ var PiRunner = class {
         resolve(1);
         return;
       }
+      this.skillRunning = true;
+      this.children.add(child);
       child.stdin.end();
-      const onAbort = () => child.kill("SIGTERM");
+      const onAbort = () => killTree(child);
       if (opts.signal) {
         if (opts.signal.aborted)
           onAbort();
@@ -369,6 +414,8 @@ var PiRunner = class {
       });
       child.on("close", (code) => {
         rl.close();
+        this.children.delete(child);
+        this.skillRunning = false;
         if (opts.signal)
           opts.signal.removeEventListener("abort", onAbort);
         if (code !== 0 && stderrBuf.trim()) {
@@ -392,11 +439,13 @@ var PiRunner = class {
         reject(e);
         return;
       }
+      this.children.add(child);
       child.stdin.end();
       child.stdout.on("data", (d) => out += d.toString());
       child.stderr.on("data", (d) => err += d.toString());
       child.on("error", reject);
       child.on("close", (code) => {
+        this.children.delete(child);
         if (code !== 0) {
           reject(new Error(err.trim() || `pi --list-models exit ${code}`));
           return;
@@ -423,55 +472,108 @@ function stripMarker(text) {
 }
 var SessionStore = class {
   constructor(vaultRoot) {
+    this.cache = /* @__PURE__ */ new Map();
     this.vaultRoot = vaultRoot;
+    let real = vaultRoot;
+    try {
+      real = fs.realpathSync(vaultRoot);
+    } catch {
+    }
+    this.vaultRootReal = real;
     this.baseDir = path2.join(os.homedir(), ".pi", "agent", "sessions");
   }
+  matchesVault(cwd) {
+    return cwd === this.vaultRoot || cwd === this.vaultRootReal;
+  }
   // Legge solo la prima riga di un file (riga "session" con cwd/id/timestamp).
-  readFirstLine(file) {
+  async readFirstLine(file) {
+    let fh = null;
     try {
-      const fd = fs.openSync(file, "r");
-      try {
-        const buf = Buffer.alloc(8192);
-        const bytes = fs.readSync(fd, buf, 0, buf.length, 0);
-        const chunk = buf.toString("utf8", 0, bytes);
-        const nl = chunk.indexOf("\n");
-        return nl === -1 ? chunk : chunk.slice(0, nl);
-      } finally {
-        fs.closeSync(fd);
-      }
+      fh = await fs.promises.open(file, "r");
+      const buf = Buffer.alloc(8192);
+      const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
+      const chunk = buf.toString("utf8", 0, bytesRead);
+      const nl = chunk.indexOf("\n");
+      return nl === -1 ? chunk : chunk.slice(0, nl);
     } catch {
       return null;
+    } finally {
+      await fh?.close().catch(() => void 0);
     }
   }
-  // Trova tutti i .jsonl la cui prima riga ha cwd === vaultRoot, in QUALSIASI
-  // sottocartella. Cosi' evitiamo di reverse-engineerare la sanitizzazione del
-  // path che fa pi: ci basiamo sul campo `cwd` reale dentro il file.
-  collectSessionFiles() {
+  // Parse completo di un file di sessione: header (cwd/id/timestamp) + primo
+  // messaggio user. Usato solo su cache miss.
+  async parseFile(file) {
+    const first = await this.readFirstLine(file);
+    let cwd = null;
+    let id = "";
+    let createdAt = 0;
+    if (first) {
+      try {
+        const obj = JSON.parse(first);
+        if (typeof obj?.cwd === "string")
+          cwd = obj.cwd;
+        if (typeof obj?.id === "string")
+          id = obj.id;
+        if (typeof obj?.timestamp === "string") {
+          const t = Date.parse(obj.timestamp);
+          if (!Number.isNaN(t))
+            createdAt = t;
+        }
+      } catch {
+      }
+    }
+    if (!id)
+      id = path2.basename(file, ".jsonl");
+    const firstUserText = this.matchesVault(cwd) ? await this.firstUserText(file) : "";
+    return { cwd, id, createdAt, firstUserText };
+  }
+  // Entry di cache per un file, riparsata solo se (mtime, size) sono cambiati.
+  async getEntry(file) {
+    let stat;
+    try {
+      stat = await fs.promises.stat(file);
+    } catch {
+      this.cache.delete(file);
+      return null;
+    }
+    const cached = this.cache.get(file);
+    if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+      return cached;
+    }
+    const parsed = await this.parseFile(file);
+    const entry = {
+      mtimeMs: stat.mtimeMs,
+      size: stat.size,
+      createdAt: parsed.createdAt || stat.mtimeMs,
+      cwd: parsed.cwd,
+      id: parsed.id,
+      firstUserText: parsed.firstUserText
+    };
+    this.cache.set(file, entry);
+    return entry;
+  }
+  // Tutti i .jsonl sotto baseDir (qualsiasi sottocartella): il filtro per
+  // vault avviene sul campo `cwd` reale dentro il file, così evitiamo di
+  // reverse-engineerare la sanitizzazione del path che fa pi.
+  async collectSessionFiles() {
     const result = [];
     let dirs;
     try {
-      dirs = fs.readdirSync(this.baseDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => path2.join(this.baseDir, d.name));
+      const entries = await fs.promises.readdir(this.baseDir, { withFileTypes: true });
+      dirs = entries.filter((d) => d.isDirectory()).map((d) => path2.join(this.baseDir, d.name));
     } catch {
       return result;
     }
     for (const dir of dirs) {
-      let files;
       try {
-        files = fs.readdirSync(dir).filter((f) => f.endsWith(".jsonl"));
+        const files = await fs.promises.readdir(dir);
+        for (const f of files) {
+          if (f.endsWith(".jsonl"))
+            result.push(path2.join(dir, f));
+        }
       } catch {
         continue;
-      }
-      for (const f of files) {
-        const full = path2.join(dir, f);
-        const first = this.readFirstLine(full);
-        if (!first)
-          continue;
-        try {
-          const obj = JSON.parse(first);
-          if (obj && obj.cwd === this.vaultRoot)
-            result.push(full);
-        } catch {
-        }
       }
     }
     return result;
@@ -505,47 +607,25 @@ var SessionStore = class {
       rl.on("error", () => resolve(found));
     });
   }
-  // Estrae id e timestamp dalla prima riga / dal nome file.
-  parseHeader(file) {
-    const first = this.readFirstLine(file);
-    let id = "";
-    let createdAt = 0;
-    if (first) {
-      try {
-        const obj = JSON.parse(first);
-        if (typeof obj?.id === "string")
-          id = obj.id;
-        if (typeof obj?.timestamp === "string") {
-          const t = Date.parse(obj.timestamp);
-          if (!Number.isNaN(t))
-            createdAt = t;
-        }
-      } catch {
-      }
-    }
-    if (!createdAt) {
-      try {
-        createdAt = fs.statSync(file).mtimeMs;
-      } catch {
-        createdAt = Date.now();
-      }
-    }
-    if (!id)
-      id = path2.basename(file, ".jsonl");
-    return { id, createdAt };
-  }
   // Elenca le sessioni della vault corrente, piu' recenti per prime.
   // skillFilter: se passato, tiene solo le sessioni col marker skill corrispondente.
   async listSessions(skillFilter) {
-    const files = this.collectSessionFiles();
+    const files = await this.collectSessionFiles();
     const metas = [];
     for (const file of files) {
-      const { id, createdAt } = this.parseHeader(file);
-      const firstUserText = await this.firstUserText(file);
-      const skillHint = extractSkillHint(firstUserText);
+      const entry = await this.getEntry(file);
+      if (!entry || !this.matchesVault(entry.cwd))
+        continue;
+      const skillHint = extractSkillHint(entry.firstUserText);
       if (skillFilter && skillHint !== skillFilter)
         continue;
-      metas.push({ id, file, createdAt, firstUserText, skillHint });
+      metas.push({
+        id: entry.id,
+        file,
+        createdAt: entry.createdAt,
+        firstUserText: entry.firstUserText,
+        skillHint
+      });
     }
     metas.sort((a, b) => b.createdAt - a.createdAt);
     return metas;
@@ -586,6 +666,12 @@ var StreamLog = class {
   constructor(parent, showThinking, showToolCalls = false) {
     this.abortController = null;
     this.currentTextEl = null;
+    // True se l'utente ha premuto Stop: endRun() deve mostrare "Interrotto"
+    // anche se il processo chiude con code null (SIGTERM → null, non 0).
+    this.aborted = false;
+    // Scroll coalescato in requestAnimationFrame: un reflow per frame invece
+    // di uno per token (text_delta).
+    this.scrollPending = false;
     this.showThinking = showThinking;
     this.showToolCalls = showToolCalls;
     this.container = parent.createDiv({ cls: "llm-wiki-stream" });
@@ -605,6 +691,7 @@ var StreamLog = class {
   // Crea un nuovo AbortController per il run corrente e abilita lo Stop.
   beginRun() {
     this.abortController = new AbortController();
+    this.aborted = false;
     this.stopBtn.disabled = false;
     this.statusEl.setText("In esecuzione\u2026");
     this.currentTextEl = null;
@@ -614,12 +701,17 @@ var StreamLog = class {
     this.stopBtn.disabled = true;
     this.abortController = null;
     this.currentTextEl = null;
-    this.statusEl.setText(code === 0 || code == null ? "Completato" : `Uscito (code ${code})`);
+    if (this.aborted) {
+      this.statusEl.setText("Interrotto");
+    } else {
+      this.statusEl.setText(code === 0 || code == null ? "Completato" : `Uscito (code ${code})`);
+    }
   }
   abort() {
     if (this.abortController) {
+      this.aborted = true;
       this.abortController.abort();
-      this.statusEl.setText("Interrotto");
+      this.statusEl.setText("Interrompo\u2026");
     }
   }
   clear() {
@@ -675,7 +767,16 @@ var StreamLog = class {
         break;
       }
     }
-    this.logEl.scrollTop = this.logEl.scrollHeight;
+    this.scheduleScroll();
+  }
+  scheduleScroll() {
+    if (this.scrollPending)
+      return;
+    this.scrollPending = true;
+    requestAnimationFrame(() => {
+      this.scrollPending = false;
+      this.logEl.scrollTop = this.logEl.scrollHeight;
+    });
   }
   // Render statico di eventi storici (resume di una sessione).
   renderHistory(events) {
@@ -1161,6 +1262,7 @@ var LlmWikiControlPlugin = class extends import_obsidian7.Plugin {
     this.addSettingTab(new LlmWikiSettingTab(this.app, this));
   }
   onunload() {
+    this.runner?.killAll();
   }
   getVaultRoot() {
     const adapter = this.app.vault.adapter;
@@ -1194,6 +1296,13 @@ var LlmWikiControlPlugin = class extends import_obsidian7.Plugin {
   }
   // (Ri)configura la schedulazione del lint in base ai settings. Chiamato a
   // onload e dai toggle/intervallo nel SettingTab.
+  //
+  // Implementata come check al minuto su `lintLastRunAt` persistito (non come
+  // un setInterval lungo quanto l'intervallo): così un run scaduto parte anche
+  // dopo un riavvio di Obsidian (con un solo timer di durata pari
+  // all'intervallo, chi riavvia ogni giorno non vedrebbe mai un run con il
+  // default giornaliero), e intervalli oltre ~24 giorni non overflowano il
+  // limite a 32 bit di setInterval.
   setupLintSchedule() {
     if (this.lintIntervalId !== null) {
       window.clearInterval(this.lintIntervalId);
@@ -1201,30 +1310,63 @@ var LlmWikiControlPlugin = class extends import_obsidian7.Plugin {
     }
     if (!this.settings.lintScheduleEnabled)
       return;
-    const minutes = Math.max(5, this.settings.lintIntervalMinutes || 1440);
     this.lintIntervalId = window.setInterval(
-      () => void this.runScheduledLint(),
-      minutes * 6e4
+      () => void this.maybeRunScheduledLint(),
+      6e4
     );
     this.registerInterval(this.lintIntervalId);
+    const startupTimer = window.setTimeout(
+      () => void this.maybeRunScheduledLint(),
+      3e4
+    );
+    this.register(() => window.clearTimeout(startupTimer));
+  }
+  // Esegue il lint schedulato solo se l'ultimo run è più vecchio dell'intervallo
+  // configurato e nessun'altra skill è in corso (cede ai run manuali: il check
+  // al minuto riproverà al termine).
+  async maybeRunScheduledLint() {
+    if (!this.settings.lintScheduleEnabled || !this.runner)
+      return;
+    if (this.scheduledLintRunning || this.runner.isBusy())
+      return;
+    const minutes = Math.max(5, this.settings.lintIntervalMinutes || 1440);
+    const elapsed = Date.now() - (this.settings.lintLastRunAt || 0);
+    if (elapsed < minutes * 6e4)
+      return;
+    await this.runScheduledLint();
   }
   // Esegue wiki-lint in background (no --fix), salva il report e notifica.
+  // Timeout di sicurezza a 30 minuti: un processo pi bloccato non deve tenere
+  // occupato il flag (e quindi saltare tutti i run successivi) per sempre.
   async runScheduledLint() {
     if (this.scheduledLintRunning || !this.runner)
       return;
     this.scheduledLintRunning = true;
+    this.settings.lintLastRunAt = Date.now();
+    await this.saveSettings();
+    const ac = new AbortController();
+    const timeoutMs = 30 * 6e4;
+    const timeout = window.setTimeout(() => ac.abort(), timeoutMs);
     new import_obsidian7.Notice("LLM Wiki: avvio lint schedulato\u2026");
     try {
-      await this.runner.runSkill({
+      const code = await this.runner.runSkill({
         skill: "wiki-lint",
         prompt: "[llm-wiki:lint] Esegui un audit della wiki con wiki-lint in modalit\xE0 non interattiva (senza --fix). Salva il report in _notes/lint/lint-report.md.",
+        signal: ac.signal,
         onEvent: () => {
         }
       });
-      new import_obsidian7.Notice("LLM Wiki: lint schedulato completato (_notes/lint/lint-report.md).");
+      if (ac.signal.aborted) {
+        new import_obsidian7.Notice("LLM Wiki: lint schedulato interrotto per timeout (30 min).");
+      } else if (code === 0 || code == null) {
+        new import_obsidian7.Notice("LLM Wiki: lint schedulato completato (_notes/lint/lint-report.md).");
+      } else {
+        new import_obsidian7.Notice(`LLM Wiki: lint schedulato uscito con code ${code}.`);
+      }
     } catch (e) {
       new import_obsidian7.Notice(`LLM Wiki: lint schedulato fallito \u2014 ${String(e)}`);
     } finally {
+      window.clearTimeout(timeout);
       this.scheduledLintRunning = false;
     }
   }

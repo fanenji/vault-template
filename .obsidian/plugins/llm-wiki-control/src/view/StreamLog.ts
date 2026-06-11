@@ -10,6 +10,12 @@ export class StreamLog {
   private showToolCalls: boolean;
   private abortController: AbortController | null = null;
   private currentTextEl: HTMLElement | null = null;
+  // True se l'utente ha premuto Stop: endRun() deve mostrare "Interrotto"
+  // anche se il processo chiude con code null (SIGTERM → null, non 0).
+  private aborted = false;
+  // Scroll coalescato in requestAnimationFrame: un reflow per frame invece
+  // di uno per token (text_delta).
+  private scrollPending = false;
 
   constructor(parent: HTMLElement, showThinking: boolean, showToolCalls = false) {
     this.showThinking = showThinking;
@@ -36,6 +42,7 @@ export class StreamLog {
   // Crea un nuovo AbortController per il run corrente e abilita lo Stop.
   beginRun(): AbortSignal {
     this.abortController = new AbortController();
+    this.aborted = false;
     this.stopBtn.disabled = false;
     this.statusEl.setText("In esecuzione…");
     this.currentTextEl = null;
@@ -46,13 +53,18 @@ export class StreamLog {
     this.stopBtn.disabled = true;
     this.abortController = null;
     this.currentTextEl = null;
-    this.statusEl.setText(code === 0 || code == null ? "Completato" : `Uscito (code ${code})`);
+    if (this.aborted) {
+      this.statusEl.setText("Interrotto");
+    } else {
+      this.statusEl.setText(code === 0 || code == null ? "Completato" : `Uscito (code ${code})`);
+    }
   }
 
   abort(): void {
     if (this.abortController) {
+      this.aborted = true;
       this.abortController.abort();
-      this.statusEl.setText("Interrotto");
+      this.statusEl.setText("Interrompo…");
     }
   }
 
@@ -109,7 +121,16 @@ export class StreamLog {
         break;
       }
     }
-    this.logEl.scrollTop = this.logEl.scrollHeight;
+    this.scheduleScroll();
+  }
+
+  private scheduleScroll(): void {
+    if (this.scrollPending) return;
+    this.scrollPending = true;
+    requestAnimationFrame(() => {
+      this.scrollPending = false;
+      this.logEl.scrollTop = this.logEl.scrollHeight;
+    });
   }
 
   // Render statico di eventi storici (resume di una sessione).

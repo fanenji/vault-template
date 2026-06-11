@@ -1,6 +1,6 @@
 {
   "name": "llm-wiki-control",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Obsidian control panel for llm-wiki Agent Skills (pilots pi headless).",
   "main": "main.js",
   "scripts": {
