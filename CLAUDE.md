@@ -28,7 +28,23 @@ Il contesto operativo (struttura della vault, skill, convenzioni, QMD, regole) �
 - **Plugin**: gli installer copiano solo `manifest.json`, `main.js`, `styles.css`. Dopo modifiche a `src/`, ricompila (o allinea `main.js` in modo equivalente), altrimenti i target non ricevono la modifica.
 - **Prompt delle skill** (`prompts/*.md`): il parser dei FILE block è strict — se tocchi il formato di output richiesto, aggiorna parser e test insieme.
 
-### Convenzioni di commit
+### Vault di test: `../vault-test`
+
+Esiste una vault gemella in `/Users/S.Parodi/Vaults/vault-test` che **eredita live la machinery** da questo template via symlink assoluti:
+
+- `.claude/skills` → `vault-template/.claude/skills` (e `.opencode/skills|commands` a cascata, via symlink relativi)
+- `.claude/commands` → `vault-template/.claude/commands`
+- `_system/scripts` → `vault-template/_system/scripts`
+- `.obsidian/plugins/llm-wiki-control/main.js` → `vault-template/.../main.js` (per vedere le modifiche al plugin serve ricaricare Obsidian nella vault-test)
+
+Tutto il resto è **proprio di vault-test** e indipendente: `wiki/`, `raw/`, `_inbox/`, `.llm-wiki/` (stato), `.qmd/` (indice), `CLAUDE.md`/`AGENTS.md`, config Obsidian. Gli esperimenti lì non sporcano mai il template.
+
+Come usarla durante lo sviluppo:
+
+- **Ogni modifica a script/skill/comandi nel template è immediatamente attiva in vault-test** — niente install, niente sync. Per provarla: `cd /Users/S.Parodi/Vaults/vault-test` ed esegui da lì (gli script risolvono la vault dal cwd via `find_vault_root`).
+- Usala per i **test manuali/E2E con contenuto reale persistente** (ingest di documenti veri, query, lint su una wiki popolata). Per i test automatici e usa-e-getta resta la regola della vault temporanea `mktemp`.
+- **Non lanciare `install-into-vault.sh` su vault-test**: l'installer copierebbe file reali sopra/attraverso i symlink. Vault-test non ne ha bisogno per definizione.
+- Se aggiungi una **nuova categoria di machinery** (una nuova top-level dir condivisa), crea il symlink corrispondente anche in vault-test, e verifica lo stato dei link con `ls -la` (è già successo che `commands` fosse una copia stale invece di un symlink).
 
 - Messaggi convenzionali (`feat(scope):`, `fix(scope):`) con corpo che spiega il perché.
 - Non committare lo stato UI di Obsidian (`workspace.json`, `data.json` di plugin terzi): viene raccolto dai commit di vault backup.
