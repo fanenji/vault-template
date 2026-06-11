@@ -1,89 +1,35 @@
 # CLAUDE.md
 
-Istruzioni per agenti (Claude Code, OpenCode, Pi, …) che operano su questa vault.
+Istruzioni per Claude Code su questa vault. Gli altri agenti (Pi, OpenCode, …) sono **operatori della KB** e leggono solo `AGENTS.md`; se sei l'operatore della KB e non Claude Code, il tuo documento è quello.
 
-## Cos'è questa vault
+## Ripartizione dei ruoli
 
-Una **knowledge base LLM-driven** organizzata come llm-wiki. Documenti grezzi vivono in `raw/sources/` (immutabili); le pagine wiki generate dall'LLM vivono in `wiki/` (modificabili). `purpose.md` e `schema.md` definiscono scope e regole strutturali — leggili prima di qualsiasi operazione non banale.
+In questa vault Claude Code è lo **sviluppatore del sistema llm-wiki** (skill, script, plugin, installer) e, all'occorrenza, anche operatore della KB. Pi (DeepSeek) gestisce la knowledge base e opera solo tramite le skill.
 
-## Skill disponibili
+Il contesto operativo (struttura della vault, skill, convenzioni, QMD, regole) è in AGENTS.md, importato qui sotto. **Nota**: la sezione "Il tuo ruolo: operatore" di AGENTS.md vale per gli altri agenti — tu puoi modificare la machinery, ma quando operi sulla KB rispetta le stesse regole operative (skill, convenzioni, conferme prima di azioni distruttive).
 
-Le funzionalità principali sono esposte come **Agent Skills** in `.claude/skills/`. Carica la skill rilevante prima di operare:
+@AGENTS.md
 
-| Skill | Quando usarla |
-|---|---|
-| `wiki-query` | L'utente chiede informazioni che richiedono ricerca nella wiki |
-| `wiki-lint` | Audit di salute della wiki (broken link, orfani, contraddizioni) |
-| `wiki-ingest` | Nuovi documenti da processare in `raw/sources/` o specificati dall'utente |
-| `deep-research` | Ricerca esterna (web) su un argomento, da integrare nella wiki |
+## Ruolo: sviluppo del sistema
 
-Ogni skill ha un proprio `SKILL.md` con il contratto operativo.
+### Cosa è "machinery"
 
-## Convenzioni rapide
+- `.claude/skills/*/` — SKILL.md (contratti), `scripts/` (Python), `prompts/`, `tests/`
+- `.claude/commands/` — slash command (symlinkati in `.opencode/`)
+- `_system/scripts/` — `init-vault.sh` (setup), `install-into-vault.sh` (updater per vault target)
+- `.obsidian/plugins/llm-wiki-control/` — plugin Obsidian (sorgenti in `src/`, compilato in `main.js`)
 
-- **Wikilink**: usa sempre `[[nome-pagina]]` per cross-reference. Case-insensitive.
-- **Frontmatter**: ogni pagina wiki ha YAML frontmatter con almeno `type`, `title`, `created`.
-- **Tipi pagina**: `entity`, `concept`, `source`, `query`, `synthesis` (vedi `schema.md`).
-- **Cartella raw/**: immutabile. Mai modificare contenuto, solo aggiungere.
-- **Cartella wiki/**: modificabile dagli agenti. `index.md`, `log.md`, `overview.md` sono auto-gestiti.
-- **Lingua**: l'output rispetta la lingua del contenuto di input (auto-detect).
+### Regole di sviluppo
 
-## Stato interno
+- **Test obbligatori** dopo ogni modifica agli script: le suite sono in `.claude/skills/wiki-ingest/tests/` e `.claude/skills/wiki-lint/tests/` (`python3 -m unittest discover` dalla cartella tests). Sono unittest stdlib: non introdurre dipendenze.
+- **Script self-contained**: gli script delle skill usano solo stdlib, trovano la vault con `find_vault_root()` (risale cercando `wiki/` + `.llm-wiki/`), leggono `.llm-wiki/config.json` best-effort con default nei flag CLI. Mantieni questo pattern.
+- **Verifica E2E in vault temporanea** (`mktemp -d` con `wiki/` + `.llm-wiki/`): mai sporcare la `wiki/` del template con dati di prova.
+- **Sincronizza la documentazione**: se cambi il comportamento di una skill, aggiorna il suo SKILL.md; se cambi lo stato in `.llm-wiki/`, aggiorna `.llm-wiki/README.md` e `.gitignore`; se aggiungi file machinery, verifica che `install-into-vault.sh` li copra (è l'updater delle vault target — testalo con `--dry-run` su un target finto).
+- **Plugin**: gli installer copiano solo `manifest.json`, `main.js`, `styles.css`. Dopo modifiche a `src/`, ricompila (o allinea `main.js` in modo equivalente), altrimenti i target non ricevono la modifica.
+- **Prompt delle skill** (`prompts/*.md`): il parser dei FILE block è strict — se tocchi il formato di output richiesto, aggiorna parser e test insieme.
 
-`.llm-wiki/` contiene queue di ingest, cache SHA256, merge pendenti (`pending-merges.json`) e coda di review (`review/items.json`). L'indice QMD vive a parte in `.qmd/` (project-local). **Non modificare a mano** salvo per debug. Le skill aggiornano lo stato in modo idempotente.
+### Convenzioni di commit
 
-Dopo un ingest, controlla le code pendenti con:
-
-```bash
-python .claude/skills/wiki-ingest/scripts/pending.py merges list   # body merge LLM da completare
-python .claude/skills/wiki-ingest/scripts/pending.py reviews list  # decisioni umane richieste
-```
-
-## `_system/`
-
-Cartella per configurazione Obsidian e script di sistema:
-- `_system/canvas/` — file `.canvas` (whiteboards visivi), popolati manualmente dall'utente
-- `_system/templates/` — template di note Obsidian, popolati manualmente
-- `_system/scripts/init-vault.sh` — script di inizializzazione (markitdown + qmd + DDG + indice QMD)
-
-Il pattern segue le convenzioni di Obsidian: `_system/` raggruppa tutto ciò che non è contenuto della knowledge base (è "macchina", non "conoscenza").
-
-## Retrieval
-
-La ricerca nella wiki (lessicale + semantica + reranking) usa [QMD](https://github.com/tobi/qmd) 2.5.2. L'indice è **project-local** in `.qmd/` (discovery dal cwd, come git): esegui sempre `qmd` dalla **vault root**. Il vecchio flag `--db` non esiste più — non usarlo.
-
-Comandi shell utili:
-
-```bash
-qmd query "domanda" --json -n 10    # hybrid search con reranking
-qmd vsearch "concetto" -n 5         # vector-only
-qmd search "termine esatto"         # BM25-only
-qmd get "wiki/entities/foo.md"      # recupera un file
-qmd multi-get "wiki/concepts/*.md"  # batch
-qmd update && qmd embed             # rinfresca l'indice dopo modifiche
-```
-
-Dopo ogni ingest, le skill chiamano `qmd update && qmd embed` per mantenere l'indice coerente.
-
-**QMD — primo avvio**: al primo `qmd embed` e al primo `qmd query`, QMD scarica due modelli GGUF (~400 MB totali). Richiede connessione. Se il comando va in timeout:
-1. Rilancia `qmd update && qmd embed` (dalla vault root) su una rete stabile.
-2. Per le query, usa `--no-rerank` per saltare il secondo modello: `qmd query "..." --no-rerank`.
-
-## Configurazione Tavily (deep-research)
-
-La skill `deep-research` usa Tavily di default e DuckDuckGo come fallback automatico. Per usare Tavily:
-
-1. Apri `.llm-wiki/secrets.json` (già creato da `init-vault.sh`, non committato):
-   ```json
-   { "TAVILY_API_KEY": "tvly-xxxxxxxxxxxxxxxx" }
-   ```
-2. Oppure: `export TAVILY_API_KEY="tvly-..."` nel tuo `.zshrc` / `.bashrc`.
-
-Senza Tavily il fallback DuckDuckGo è attivo automaticamente — non serve configurazione.
-
-## Regole generali
-
-- Non cancellare file senza conferma esplicita dell'utente.
-- Conferma sempre prima di operazioni distruttive sulla wiki (rinomine massive, merge pagine).
-- Per ingest di batch (>5 file), avvisa l'utente del costo stimato in token prima di procedere.
-- Se una skill fallisce a metà, lo stato in `.llm-wiki/` è coerente: puoi sempre rilanciare la skill (idempotente).
+- Messaggi convenzionali (`feat(scope):`, `fix(scope):`) con corpo che spiega il perché.
+- Non committare lo stato UI di Obsidian (`workspace.json`, `data.json` di plugin terzi): viene raccolto dai commit di vault backup.
+- Commit e push solo su richiesta dell'utente.
