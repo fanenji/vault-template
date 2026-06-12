@@ -102,6 +102,9 @@ if [ ! -f .llm-wiki/secrets.json ]; then
 EOF
   echo "✓ Creato .llm-wiki/secrets.json"
 fi
+# Solo owner: il file contiene API key in chiaro. Anche su vault già
+# inizializzate (il re-run sistema i permessi di file creati prima del fix).
+chmod 600 .llm-wiki/secrets.json
 
 echo ""
 echo "✓ Vault inizializzata."

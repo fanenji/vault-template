@@ -63,7 +63,12 @@ def append_log(vault_root: Path, line: str) -> None:
 
 
 def write_file(vault_root: Path, rel_path: str, content: str) -> None:
-    full = vault_root / rel_path
+    # is_safe_ingest_path valida il path lessicalmente; qui si confina anche
+    # il path *risolto*: un symlink dentro wiki/ non deve far scrivere fuori
+    # dalla vault.
+    full = (vault_root / rel_path).resolve()
+    if not full.is_relative_to(vault_root.resolve()):
+        raise OSError(f"path escapes vault root (symlink?): {rel_path}")
     full.parent.mkdir(parents=True, exist_ok=True)
     full.write_text(content, encoding="utf-8")
 

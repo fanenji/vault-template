@@ -86,7 +86,11 @@ def save_result(
     slug = slugify(topic)
     filename = f"research-{slug}-{today}.md"
     rel_path = f"wiki/queries/{filename}"
-    full = vault_root / rel_path
+    # Confina il path risolto dentro la vault: un symlink su wiki/queries/
+    # non deve far scrivere fuori.
+    full = (vault_root / rel_path).resolve()
+    if not full.is_relative_to(vault_root.resolve()):
+        raise SystemExit(f"path escapes vault root (symlink?): {rel_path}")
     full.parent.mkdir(parents=True, exist_ok=True)
 
     # Strip <think>/<thinking> blocks (come backend originale)
