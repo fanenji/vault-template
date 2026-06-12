@@ -991,16 +991,16 @@ var QueryPanel = class {
     searchBtn.onclick = () => this.run(false);
     const followBtn = controls.createEl("button", { text: "Follow-up" });
     followBtn.onclick = () => this.run(true);
+    this.saveBtn = controls.createEl("button", { text: "Salva la risposta in wiki/queries/" });
+    this.saveBtn.disabled = true;
+    this.saveBtn.onclick = () => this.saveAnswer();
     const newBtn = controls.createEl("button", { text: "Nuova" });
     newBtn.onclick = () => {
       this.activeSessionId = null;
+      this.saveBtn.disabled = true;
       this.log.clear();
       new import_obsidian3.Notice("Nuova conversazione");
     };
-    const saveRow = this.root.createDiv({ cls: "llm-wiki-save-row" });
-    const saveLabel = saveRow.createEl("label", { cls: "llm-wiki-save-label" });
-    this.saveCheckbox = saveLabel.createEl("input", { attr: { type: "checkbox" } });
-    saveLabel.createSpan({ text: " Salva la risposta in wiki/queries/" });
     this.log = new StreamLog(this.root, this.getSettings().showThinking, this.getSettings().showToolCalls);
     this.root.createEl("h4", { text: "Storico query" });
     this.historyEl = this.root.createDiv({ cls: "llm-wiki-history" });
@@ -1035,6 +1035,7 @@ var QueryPanel = class {
       this.log.setShowThinking(this.getSettings().showThinking);
       this.log.setShowToolCalls(this.getSettings().showToolCalls);
       this.log.renderHistory(events);
+      this.saveBtn.disabled = false;
       new import_obsidian3.Notice("Sessione caricata \u2014 usa Follow-up per continuare");
     } catch (e) {
       new import_obsidian3.Notice(`Errore caricamento sessione: ${String(e)}`);
@@ -1055,9 +1056,9 @@ var QueryPanel = class {
       new import_obsidian3.Notice("Nessuna sessione attiva: usa 'Cerca' per iniziarne una");
       return;
     }
-    const saveSuffix = this.saveCheckbox.checked ? " Salva la risposta come pagina in wiki/queries/ (step 4 della skill) e aggiorna l'indice QMD." : "";
-    const prompt = `[llm-wiki:query] ${text}${saveSuffix}`;
+    const prompt = `[llm-wiki:query] ${text}`;
     this.running = true;
+    this.saveBtn.disabled = true;
     if (!asFollowUp)
       this.log.clear();
     const signal = this.log.beginRun();
@@ -1080,8 +1081,51 @@ var QueryPanel = class {
     this.log.endRun(code);
     this.running = false;
     this.textarea.value = "";
+    this.saveBtn.disabled = !(code === 0 && this.activeSessionId);
     await this.refreshHistory();
     setTimeout(() => void this.refreshHistory(), 2e3);
+  }
+  // Follow-up sulla sessione attiva che chiede alla skill di eseguire lo
+  // step 4 (save in wiki/queries/ + aggiornamento indice QMD) sulla risposta
+  // già prodotta. Il bottone resta disabilitato dopo un save riuscito (la
+  // stessa risposta non va salvata due volte) e si riabilita su errore.
+  async saveAnswer() {
+    if (this.running) {
+      new import_obsidian3.Notice("Operazione gia' in corso");
+      return;
+    }
+    if (!this.activeSessionId) {
+      new import_obsidian3.Notice("Nessuna risposta da salvare: esegui prima una ricerca");
+      return;
+    }
+    const prompt = "[llm-wiki:query] Salva la risposta precedente come pagina in wiki/queries/ (step 4 della skill) e aggiorna l'indice QMD.";
+    this.running = true;
+    this.saveBtn.disabled = true;
+    const signal = this.log.beginRun();
+    this.log.setShowThinking(this.getSettings().showThinking);
+    this.log.setShowToolCalls(this.getSettings().showToolCalls);
+    const code = await this.runner.runSkill({
+      skill: "wiki-query",
+      prompt,
+      sessionId: this.activeSessionId,
+      signal,
+      onEvent: (ev) => {
+        if (ev.kind === "exit")
+          this.log.endRun(ev.code);
+        else if (ev.kind === "session")
+          this.activeSessionId = ev.id;
+        else
+          this.log.append(ev);
+      }
+    });
+    this.log.endRun(code);
+    this.running = false;
+    if (code === 0) {
+      new import_obsidian3.Notice("Risposta salvata in wiki/queries/");
+    } else {
+      new import_obsidian3.Notice("Salvataggio non riuscito \u2014 riprova");
+      this.saveBtn.disabled = false;
+    }
   }
 };
 

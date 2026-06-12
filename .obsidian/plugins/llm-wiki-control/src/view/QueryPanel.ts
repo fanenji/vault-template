@@ -13,7 +13,7 @@ export class QueryPanel {
   private textarea!: HTMLTextAreaElement;
   private historyEl!: HTMLElement;
   private log!: StreamLog;
-  private saveCheckbox!: HTMLInputElement;
+  private saveBtn!: HTMLButtonElement;
   private running = false;
   // Sessione corrente per i follow-up (resume via --session).
   private activeSessionId: string | null = null;
@@ -46,19 +46,20 @@ export class QueryPanel {
     const followBtn = controls.createEl("button", { text: "Follow-up" });
     followBtn.onclick = () => this.run(true);
 
+    // Salvataggio a posteriori: si abilita quando esiste una risposta nella
+    // sessione attiva (ricerca completata o sessione ripresa dallo storico) e
+    // manda un follow-up alla skill che esegue lo step 4 (save in wiki/queries/).
+    this.saveBtn = controls.createEl("button", { text: "Salva la risposta in wiki/queries/" });
+    this.saveBtn.disabled = true;
+    this.saveBtn.onclick = () => this.saveAnswer();
+
     const newBtn = controls.createEl("button", { text: "Nuova" });
     newBtn.onclick = () => {
       this.activeSessionId = null;
+      this.saveBtn.disabled = true;
       this.log.clear();
       new Notice("Nuova conversazione");
     };
-
-    // Opzione: salvare la risposta come pagina in wiki/queries/. Di default off —
-    // wiki-query salva solo su richiesta esplicita; questa checkbox la inietta.
-    const saveRow = this.root.createDiv({ cls: "llm-wiki-save-row" });
-    const saveLabel = saveRow.createEl("label", { cls: "llm-wiki-save-label" });
-    this.saveCheckbox = saveLabel.createEl("input", { attr: { type: "checkbox" } });
-    saveLabel.createSpan({ text: " Salva la risposta in wiki/queries/" });
 
     this.log = new StreamLog(this.root, this.getSettings().showThinking, this.getSettings().showToolCalls);
 
@@ -97,6 +98,8 @@ export class QueryPanel {
       this.log.setShowThinking(this.getSettings().showThinking);
       this.log.setShowToolCalls(this.getSettings().showToolCalls);
       this.log.renderHistory(events);
+      // La sessione ripresa contiene una risposta: è salvabile.
+      this.saveBtn.disabled = false;
       new Notice("Sessione caricata — usa Follow-up per continuare");
     } catch (e) {
       new Notice(`Errore caricamento sessione: ${String(e)}`);
@@ -120,11 +123,9 @@ export class QueryPanel {
       return;
     }
 
-    const saveSuffix = this.saveCheckbox.checked
-      ? " Salva la risposta come pagina in wiki/queries/ (step 4 della skill) e aggiorna l'indice QMD."
-      : "";
-    const prompt = `[llm-wiki:query] ${text}${saveSuffix}`;
+    const prompt = `[llm-wiki:query] ${text}`;
     this.running = true;
+    this.saveBtn.disabled = true;
     if (!asFollowUp) this.log.clear();
     const signal = this.log.beginRun();
     this.log.setShowThinking(this.getSettings().showThinking);
@@ -144,9 +145,55 @@ export class QueryPanel {
     this.log.endRun(code);
     this.running = false;
     this.textarea.value = "";
+    // La risposta è salvabile solo se la run è andata a buon fine e c'è una
+    // sessione da riprendere col follow-up di salvataggio.
+    this.saveBtn.disabled = !(code === 0 && this.activeSessionId);
     // Aggiorna lo storico (nuova sessione creata da pi): subito, con un
     // retry dopo 2s nel caso il file di sessione non sia ancora flushato.
     await this.refreshHistory();
     setTimeout(() => void this.refreshHistory(), 2000);
+  }
+
+  // Follow-up sulla sessione attiva che chiede alla skill di eseguire lo
+  // step 4 (save in wiki/queries/ + aggiornamento indice QMD) sulla risposta
+  // già prodotta. Il bottone resta disabilitato dopo un save riuscito (la
+  // stessa risposta non va salvata due volte) e si riabilita su errore.
+  private async saveAnswer(): Promise<void> {
+    if (this.running) {
+      new Notice("Operazione gia' in corso");
+      return;
+    }
+    if (!this.activeSessionId) {
+      new Notice("Nessuna risposta da salvare: esegui prima una ricerca");
+      return;
+    }
+    const prompt =
+      "[llm-wiki:query] Salva la risposta precedente come pagina in wiki/queries/ " +
+      "(step 4 della skill) e aggiorna l'indice QMD.";
+    this.running = true;
+    this.saveBtn.disabled = true;
+    const signal = this.log.beginRun();
+    this.log.setShowThinking(this.getSettings().showThinking);
+    this.log.setShowToolCalls(this.getSettings().showToolCalls);
+
+    const code = await this.runner.runSkill({
+      skill: "wiki-query",
+      prompt,
+      sessionId: this.activeSessionId,
+      signal,
+      onEvent: (ev) => {
+        if (ev.kind === "exit") this.log.endRun(ev.code);
+        else if (ev.kind === "session") this.activeSessionId = ev.id;
+        else this.log.append(ev);
+      },
+    });
+    this.log.endRun(code);
+    this.running = false;
+    if (code === 0) {
+      new Notice("Risposta salvata in wiki/queries/");
+    } else {
+      new Notice("Salvataggio non riuscito — riprova");
+      this.saveBtn.disabled = false;
+    }
   }
 }

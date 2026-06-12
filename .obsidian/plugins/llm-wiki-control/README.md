@@ -10,8 +10,9 @@ Plugin **desktop-only** (usa `child_process` per lanciare `pi`).
 
 - Icona ribbon + comando "Apri pannello LLM Wiki" → pannello laterale (`ItemView`).
 - Tab **Query**: domanda → `wiki-query`, streaming live, storico delle query con
-  click → resume e Follow-up (continua la sessione via `--session <id>`); checkbox
-  per salvare la risposta in `wiki/queries/`.
+  click → resume e Follow-up (continua la sessione via `--session <id>`); bottone
+  "Salva la risposta in wiki/queries/" attivo a ricerca completata (manda un
+  follow-up di salvataggio sulla sessione attiva).
 - Tab **DeepResearch**: argomento → `deep-research` (Tavily/DuckDuckGo), streaming
   con `[[wikilink]]` + cross-ref, storico, toggle **Auto-ingest** (Step 8).
 - Tab **Ingest**: seleziona un file (o l'intera cartella `_inbox/clippings`) →
