@@ -21,7 +21,7 @@ Il contesto operativo (struttura della vault, skill, convenzioni, QMD, regole) �
 
 ### Regole di sviluppo
 
-- **Test obbligatori** dopo ogni modifica agli script: le suite sono in `.claude/skills/wiki-ingest/tests/` e `.claude/skills/wiki-lint/tests/` (`python3 -m unittest discover` dalla cartella tests). Sono unittest stdlib: non introdurre dipendenze.
+- **Test obbligatori** dopo ogni modifica agli script: le suite sono in `.claude/skills/wiki-ingest/tests/`, `.claude/skills/wiki-lint/tests/` e `.claude/skills/graph-analyze/tests/` (`python3 -m unittest discover` dalla cartella tests). Sono unittest stdlib: non introdurre dipendenze.
 - **Script self-contained**: gli script delle skill usano solo stdlib, trovano la vault con `find_vault_root()` (risale cercando `wiki/` + `.llm-wiki/`), leggono `.llm-wiki/config.json` best-effort con default nei flag CLI. Mantieni questo pattern.
 - **Verifica E2E in vault temporanea** (`mktemp -d` con `wiki/` + `.llm-wiki/`): mai sporcare la `wiki/` del template con dati di prova.
 - **Sincronizza la documentazione**: se cambi il comportamento di una skill, aggiorna il suo SKILL.md; se cambi lo stato in `.llm-wiki/`, aggiorna `.llm-wiki/README.md` e `.gitignore`; se aggiungi file machinery, verifica che `install-into-vault.sh` li copra (è l'updater delle vault target — testalo con `--dry-run` su un target finto).

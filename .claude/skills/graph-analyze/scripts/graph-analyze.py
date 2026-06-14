@@ -26,6 +26,9 @@ from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+import _graph_metrics as gm
+
 WIKI_DIR = "wiki"
 NOTES_DIR = "_notes"
 EXCLUDE_ORPHAN = {"index", "log", "overview", "glossary", "lint-report", "meetings-index"}
@@ -218,7 +221,101 @@ def build_report(metrics: dict, today: str) -> str:
     lines.append(f"- **Struttura della rete**: {structure}")
     lines.append("")
 
+    if metrics.get("deep"):
+        lines.extend(build_deep_sections(metrics))
+
     return "\n".join(lines)
+
+
+def build_deep_sections(metrics: dict) -> list[str]:
+    """Sezioni avanzate (--deep): componenti, community, centralità, link suggeriti."""
+    lines: list[str] = []
+
+    # --- Componenti connesse -------------------------------------------------
+    components = metrics["components"]
+    lines.append("## Componenti connesse")
+    lines.append("")
+    if len(components) == 1:
+        lines.append(f"Grafo connesso: un'unica componente da {len(components[0])} pagine.")
+    else:
+        islands = [c for c in components[1:]]
+        lines.append(
+            f"{len(components)} componenti — la principale ha {len(components[0])} pagine; "
+            f"{len(islands)} isole scollegate:"
+        )
+        lines.append("")
+        for comp in islands:
+            members = ", ".join(f"[[{n}]]" for n in sorted(comp)[:8])
+            extra = "…" if len(comp) > 8 else ""
+            lines.append(f"- isola da {len(comp)}: {members}{extra}")
+    lines.append("")
+
+    # --- Community tematiche -------------------------------------------------
+    members = metrics["community_members"]
+    mod = metrics["modularity"]
+    n_real = sum(1 for g in members.values() if len(g) >= 2)
+    n_singletons = sum(1 for g in members.values() if len(g) == 1)
+    lines.append("## Community tematiche (Louvain)")
+    lines.append("")
+    singleton_note = f" (+{n_singletons} pagine isolate)" if n_singletons else ""
+    lines.append(
+        f"{n_real} community emergenti dalla topologia dei link{singleton_note} "
+        f"(modularità Q = {mod:.3f}). Le pagine-chiave sono le più centrali (PageRank) di ciascun gruppo:"
+    )
+    lines.append("")
+    lines.append("| Cluster | Pagine | Pagine-chiave |")
+    lines.append("|---|---|---|")
+    for cid in sorted(members.keys()):
+        group = members[cid]
+        if len(group) < 2:
+            continue
+        key = ", ".join(f"[[{n}]]" for n in group[:4])
+        lines.append(f"| #{cid} | {len(group)} | {key} |")
+    lines.append("")
+
+    # --- Centralità: hub globali e ponti ------------------------------------
+    lines.append("## Centralità — hub globali e pagine-ponte")
+    lines.append("")
+    lines.append("**Hub globali (PageRank)** — importanza pesata anche dall'importanza di chi linka:")
+    lines.append("")
+    lines.append("| Pagina | PageRank |")
+    lines.append("|---|---|")
+    for stem, score in metrics["top_pagerank"][:8]:
+        lines.append(f"| [[{stem}]] | {score:.4f} |")
+    lines.append("")
+    lines.append(
+        "**Pagine-ponte (betweenness)** — stanno sui cammini fra gruppi diversi; "
+        "rimuoverle frammenterebbe la wiki. Candidate a link ridondanti:"
+    )
+    lines.append("")
+    lines.append("| Pagina | Betweenness |")
+    lines.append("|---|---|")
+    for stem, score in metrics["top_betweenness"][:8]:
+        if score <= 0:
+            continue
+        lines.append(f"| [[{stem}]] | {score:.2f} |")
+    lines.append("")
+
+    # --- Link suggeriti ------------------------------------------------------
+    suggestions = metrics["suggestions"]
+    lines.append("## Link suggeriti (deduzione strutturale — da verificare)")
+    lines.append("")
+    if not suggestions:
+        lines.append("_Nessuna coppia non collegata con abbastanza vicini in comune._")
+    else:
+        lines.append(
+            "Coppie di pagine **non collegate** che condividono molti vicini: candidate "
+            "a un wikilink. _Deduzione topologica, non un fatto wiki — valuta caso per caso._"
+        )
+        lines.append("")
+        lines.append("| Pagina A | Pagina B | Vicini in comune | Score |")
+        lines.append("|---|---|---|---|")
+        for s in suggestions:
+            common = ", ".join(f"[[{c}]]" for c in s["common"][:4])
+            lines.append(f"| [[{s['a']}]] | [[{s['b']}]] | {common} ({s['n_common']}) | {s['score']} |")
+    lines.append("")
+
+    return lines
 
 
 def print_summary(metrics: dict, today: str, output_path: Path | None = None) -> None:
@@ -236,6 +333,11 @@ def print_summary(metrics: dict, today: str, output_path: Path | None = None) ->
     print(f"N = {N}  |  L = {L_internal}  |  L_broken = {L_broken}")
     print(f"<K_out> = {K_out:.2f}  |  <K_in> = {K_in:.2f}  |  d = {density:.6f} ({density_pct:.3f}%)")
     print(f"Orphans: {N_orphans}  |  Sinks: {N_sinks}")
+    if metrics.get("deep"):
+        n_comp = len(metrics["components"])
+        n_comm = sum(1 for g in metrics["community_members"].values() if len(g) >= 2)
+        print(f"Components: {n_comp}  |  Communities: {n_comm}  |  Q = {metrics['modularity']:.3f}")
+        print(f"Suggested links: {len(metrics['suggestions'])}")
     if output_path:
         print(f"Output: {output_path}")
 
@@ -245,6 +347,9 @@ def main() -> int:
     ap.add_argument("--vault", type=Path, default=None, help="Vault root (default: auto-detect)")
     ap.add_argument("--console-only", action="store_true",
                     help="Print summary only, do not write _notes/graph-analysis-<date>.md")
+    ap.add_argument("--deep", action="store_true",
+                    help="Analisi avanzata: community (Louvain), centralità (PageRank/betweenness), "
+                         "componenti connesse, link suggeriti")
     args = ap.parse_args()
 
     vault_root = args.vault.resolve() if args.vault else find_vault_root(Path.cwd())
@@ -256,6 +361,10 @@ def main() -> int:
     nodes = collect_nodes(wiki_root)
     out_raw, edge_counts = extract_edges(nodes)
     metrics = compute_metrics(nodes, edge_counts, out_raw)
+
+    if args.deep:
+        metrics["deep"] = True
+        metrics.update(gm.enrich(nodes, edge_counts, exclude_auto=EXCLUDE_ORPHAN))
 
     today = date.today().isoformat()
     output_path = vault_root / NOTES_DIR / f"graph-analysis-{today}.md"
