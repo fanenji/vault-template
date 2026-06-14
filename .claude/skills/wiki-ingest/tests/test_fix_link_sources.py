@@ -25,6 +25,19 @@ def page_with_sources(sources_line: str) -> str:
     )
 
 
+def malformed_page(sources_line: str) -> str:
+    """Frontmatter senza il `---` di apertura (solo chiusura)."""
+    return (
+        "type: source\n"
+        'title: "Source: doc"\n'
+        "created: 2026-01-01\n"
+        f"{sources_line}\n"
+        "tags: []\n"
+        "---\n\n"
+        "Body.\n"
+    )
+
+
 class TestCurrentSourcesValues(unittest.TestCase):
     def test_inline_single_quoted(self):
         self.assertEqual(
@@ -157,6 +170,63 @@ class TestFixPageFallback(unittest.TestCase):
             page = self._wiki(root, "doc.md", page_with_sources('sources: ["doc.md"]'))
             fls.fix_page(root, page, dry_run=False)
             # secondo giro: ora ha source_path → ramo standard, nessun cambiamento
+            self.assertEqual(fls.fix_page(root, page, dry_run=False), "unchanged")
+
+
+class TestRepairMissingFence(unittest.TestCase):
+    def test_repairs_missing_opening_fence(self):
+        out = fls.repair_missing_fence(malformed_page('sources: ["doc.md"]'))
+        self.assertIsNotNone(out)
+        self.assertTrue(out.startswith("---\ntype: source\n"))
+
+    def test_wellformed_unchanged(self):
+        self.assertIsNone(fls.repair_missing_fence(page_with_sources('sources: ["doc.md"]')))
+
+    def test_prose_body_not_touched(self):
+        # un doc che inizia con prosa e ha un --- (riga orizzontale) nel body
+        doc = "Questo è un testo introduttivo.\n\n---\n\nAltra sezione.\n"
+        self.assertIsNone(fls.repair_missing_fence(doc))
+
+    def test_no_closing_fence_not_touched(self):
+        doc = "type: source\ntitle: x\n\nBody senza fence di chiusura.\n"
+        self.assertIsNone(fls.repair_missing_fence(doc))
+
+
+class TestFixPageRepairsFence(unittest.TestCase):
+    def _vault(self, tmp):
+        root = Path(tmp)
+        (root / "wiki" / "sources").mkdir(parents=True)
+        (root / "raw" / "sources").mkdir(parents=True)
+        return root
+
+    def test_malformed_with_resolvable_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._vault(tmp)
+            (root / "raw" / "sources" / "doc.md").write_text("raw\n", encoding="utf-8")
+            page = root / "wiki" / "sources" / "doc.md"
+            page.write_text(malformed_page('sources: ["doc.md"]'), encoding="utf-8")
+            self.assertEqual(fls.fix_page(root, page, dry_run=False), "updated")
+            out = page.read_text(encoding="utf-8")
+            self.assertTrue(out.startswith("---\n"))           # fence riparato
+            self.assertIn('source_path: "[[raw/sources/doc]]"', out)
+
+    def test_malformed_without_resolvable_source_still_repairs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._vault(tmp)
+            page = root / "wiki" / "sources" / "doc.md"
+            page.write_text(malformed_page('sources: ["ghost.md"]'), encoding="utf-8")
+            self.assertEqual(fls.fix_page(root, page, dry_run=False), "updated")
+            out = page.read_text(encoding="utf-8")
+            self.assertTrue(out.startswith("---\n"))           # fence riparato
+            self.assertNotIn("source_path:", out)              # nessun source_path derivabile
+
+    def test_malformed_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._vault(tmp)
+            (root / "raw" / "sources" / "doc.md").write_text("raw\n", encoding="utf-8")
+            page = root / "wiki" / "sources" / "doc.md"
+            page.write_text(malformed_page('sources: ["doc.md"]'), encoding="utf-8")
+            fls.fix_page(root, page, dry_run=False)
             self.assertEqual(fls.fix_page(root, page, dry_run=False), "unchanged")
 
 
