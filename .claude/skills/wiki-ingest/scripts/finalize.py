@@ -39,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from _parse_file_blocks import parse_blocks, ParsedFileBlock
 from _sanitize import sanitize_ingested_content
 from _merge_pages import merge_pages, MergeOutcome, BODY_SHRINK_THRESHOLD, parse_frontmatter
+from _source_meta import raw_wikilink, extract_source_url, apply_source_meta
 from build_index import build_index
 import cache as cache_mod
 import pending as pending_mod
@@ -121,6 +122,12 @@ def finalize(
     written_paths: list[str] = []
     hard_failures: list[str] = []
 
+    # Metadati per la normalizzazione delle pagine wiki/sources/ (vedi
+    # _source_meta.py): wikilink al documento raw e URL originale (se il
+    # sorgente è un markdown con campo `source:` nel frontmatter).
+    source_link = raw_wikilink(source_path.name)
+    source_url = extract_source_url(source_path)
+
     for block in blocks:
         rel = block.path
         raw = block.content
@@ -150,7 +157,12 @@ def finalize(
                 # Content page: merge con esistente se presente
                 existing = full.read_text(encoding="utf-8") if full.exists() else None
                 outcome: MergeOutcome = merge_pages(sanitized, existing, source_path.name)
-                write_file(vault_root, rel, outcome.content)
+                content = outcome.content
+                if rel.startswith("wiki/sources/"):
+                    # Normalizzazione deterministica post-merge: source_path
+                    # come wikilink al raw, sources = URL originale se nota.
+                    content = apply_source_meta(content, source_link, source_url)
+                write_file(vault_root, rel, content)
                 if outcome.merge_body_needed:
                     merge_id = pending_mod.add_merge(
                         vault_root,

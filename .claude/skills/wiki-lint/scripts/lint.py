@@ -137,8 +137,12 @@ def parse_frontmatter(content: str) -> tuple[dict, str]:
         # rimuovi quote
         if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
             value = value[1:-1]
+        # wikilink scalare (es. source_path: "[[raw/sources/foo]]"): è una
+        # stringa, non va confuso con una flow list
+        if value.startswith("[[") and value.endswith("]]"):
+            fm[key] = value
         # flow list
-        if value.startswith("[") and value.endswith("]"):
+        elif value.startswith("[") and value.endswith("]"):
             items = [v.strip().strip('"').strip("'") for v in value[1:-1].split(",") if v.strip()]
             fm[key] = items
         elif value == "":
@@ -384,12 +388,23 @@ def check_schema_rules(pages: list[PageData], slug_map: dict[str, Path],
                         affected_pages=[s],
                     ))
 
-        # source_path esistente
+        # source_path esistente — formato wikilink `[[raw/sources/foo]]`
+        # (canonico, senza .md per i markdown) o path semplice (legacy)
         if page_type == "source":
             sp = p.frontmatter.get("source_path")
             if sp and isinstance(sp, str):
-                referenced_sources.add(Path(sp).name)
-                if not (vault_root / sp).exists():
+                target = sp.strip()
+                if target.startswith("[[") and target.endswith("]]"):
+                    target = target[2:-2].strip()
+                resolved_src = next(
+                    (c for c in (target, f"{target}.md")
+                     if (vault_root / c).is_file()),
+                    None,
+                )
+                if resolved_src:
+                    referenced_sources.add(Path(resolved_src).name)
+                else:
+                    referenced_sources.add(Path(target).name)
                     results.append(LintResult(
                         type="frontmatter-ref",
                         severity="warning",

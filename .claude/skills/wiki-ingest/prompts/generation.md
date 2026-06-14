@@ -49,6 +49,17 @@ Required fields and types:
                `wiki/`, `.md`, or `[[…]]` here — slugs only.
   • sources  — array of source filenames; MUST include "{{source_filename}}".
 
+Additional fields for the source summary page (wiki/sources/ only):
+  • source_path — quoted wikilink to the raw document:
+      source_path: "[[raw/sources/<filename>]]"
+    For markdown sources omit the .md extension in the wikilink; for other
+    formats (pdf, docx, …) keep the extension.
+  • sources — if the source document's own frontmatter contains a `source:`
+    field with the URL of the original web page, use that URL instead of the
+    filename: sources: ["<url>"].
+  (Both fields are re-normalized deterministically by the pipeline after
+  generation — emitting them in this form avoids merge churn.)
+
 Concrete example of a complete, parseable page:
 
     ---

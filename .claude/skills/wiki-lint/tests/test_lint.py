@@ -115,6 +115,32 @@ class TestSchemaChecks(LintVaultTestCase):
         self.assertTrue(any(r.type == "frontmatter-ref" and "sparito.pdf" in r.detail
                             for r in results))
 
+    def test_source_path_wikilink_resolves_without_md_extension(self):
+        # Formato canonico: wikilink quotato, senza .md per i markdown
+        raw = self.vault / "raw" / "sources"
+        raw.mkdir(parents=True)
+        (raw / "clip.md").write_text("---\nsource: https://example.com\n---\nbody\n",
+                                     encoding="utf-8")
+        self.write("sources/clip.md", page("source", "Clip", "Body.",
+                                           extra_fm='source_path: "[[raw/sources/clip]]"\n'))
+        _, results = self.run_checks(lint.check_schema_rules)
+        self.assertEqual([r for r in results if r.type == "frontmatter-ref"], [])
+        # Il raw risolto via wikilink non deve risultare not-ingested
+        self.assertEqual([r for r in results if r.type == "not-ingested"], [])
+
+    def test_source_path_wikilink_missing_on_disk(self):
+        self.write("sources/doc.md", page("source", "Doc", "Body.",
+                                          extra_fm='source_path: "[[raw/sources/sparito]]"\n'))
+        _, results = self.run_checks(lint.check_schema_rules)
+        self.assertTrue(any(r.type == "frontmatter-ref" and "sparito" in r.detail
+                            for r in results))
+
+    def test_source_path_wikilink_parsed_as_string(self):
+        # Il parser non deve confondere "[[...]]" con una flow list YAML
+        fm, _ = lint.parse_frontmatter(
+            '---\ntype: source\nsource_path: "[[raw/sources/foo]]"\n---\nbody\n')
+        self.assertEqual(fm["source_path"], "[[raw/sources/foo]]")
+
     def test_raw_source_not_ingested(self):
         raw = self.vault / "raw" / "sources"
         raw.mkdir(parents=True)

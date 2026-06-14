@@ -30,6 +30,9 @@ WIKI_DIR = "wiki"
 NOTES_DIR = "_notes"
 EXCLUDE_ORPHAN = {"index", "log", "overview", "glossary", "lint-report", "meetings-index"}
 LINK_PATTERN = re.compile(r"\[\[([^\]|#]+)")
+# Frontmatter YAML: escluso dall'estrazione dei link (come wiki-lint) — può
+# contenere wikilink di metadato (es. source_path) che non sono edge del grafo.
+FRONTMATTER_PATTERN = re.compile(r"^---\s*\n.*?\n---\s*\n", re.DOTALL)
 
 
 def find_vault_root(start: Path) -> Path:
@@ -62,7 +65,8 @@ def extract_edges(nodes: dict[str, Path]) -> tuple[defaultdict, defaultdict]:
             content = filepath.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        for t in LINK_PATTERN.findall(content):
+        body = FRONTMATTER_PATTERN.sub("", content, count=1)
+        for t in LINK_PATTERN.findall(body):
             t_clean = t.lower().strip()
             out_raw[stem] += 1
             edge_counts[(stem, t_clean)] += 1

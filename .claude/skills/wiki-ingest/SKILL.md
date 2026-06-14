@@ -137,6 +137,7 @@ Output JSON con:
 `finalize.py` si occupa automaticamente di:
 - Sanitize (rimuove code fence, ripara frontmatter)
 - Path safety check (reject `..`, absolute paths, traversal) + confinamento del path *risolto* dentro la vault (un symlink in `wiki/` non può far scrivere fuori)
+- **Normalizzazione pagine `wiki/sources/`** (post-merge, deterministica — `_source_meta.py`): `source_path` diventa wikilink quotato al documento raw (`source_path: "[[raw/sources/<nome>]]"`, senza `.md` per i markdown); se il sorgente è un markdown con campo `source:` (URL pagina originale, pattern Web Clipper) nel frontmatter, `sources` diventa `["<url>"]`. Per migrare il pregresso: `python .claude/skills/wiki-ingest/scripts/fix_link_sources.py [--dry-run]`
 - Append a `wiki/log.md` (riga canonica; eventuali blocchi FILE per `log.md` o `index.md` emessi dall'LLM sono scartati)
 - **Rigenerazione deterministica di `wiki/index.md`** via `build_index.py` (l'indice è derivato dal filesystem, mai dall'LLM)
 - Overwrite di `wiki/overview.md` con **guardia anti-shrink**: se il nuovo body è <70% dell'esistente, tiene l'esistente (generazione probabilmente troncata)

@@ -31,9 +31,19 @@ tags: []                # opzionale
 Per `source`:
 
 ```yaml
-source_path: raw/sources/...       # path relativo
+source_path: "[[raw/sources/...]]" # wikilink al documento originale (quotato;
+                                   # senza .md per i markdown, con estensione
+                                   # per gli altri formati)
+sources: ["https://..."]           # URL della pagina web originale, se il
+                                   # documento sorgente la dichiara nel proprio
+                                   # frontmatter (campo `source:`); altrimenti
+                                   # il filename del documento
 source_sha256: <hash>              # cache invalidation
 ```
+
+Il formato di `source_path`/`sources` è normalizzato deterministicamente da
+`finalize.py` a ogni ingest; per il pregresso esiste
+`.claude/skills/wiki-ingest/scripts/fix_link_sources.py`.
 
 Per `query`:
 
