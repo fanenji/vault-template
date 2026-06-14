@@ -117,6 +117,22 @@ class TestApplySourceMeta(unittest.TestCase):
         page = "# Pagina senza frontmatter\n"
         self.assertEqual(apply_source_meta(page, self.LINK, self.URL), page)
 
+    def test_source_path_as_list_when_multiple(self):
+        links = ["[[raw/sources/a]]", "[[raw/sources/b]]"]
+        out = apply_source_meta(source_page(), links, None)
+        self.assertIn('source_path: ["[[raw/sources/a]]", "[[raw/sources/b]]"]', out)
+
+    def test_sources_as_list_when_multiple_urls(self):
+        urls = ["https://example.com/a", "https://example.com/b"]
+        out = apply_source_meta(source_page(), self.LINK, urls)
+        self.assertIn('sources: ["https://example.com/a", "https://example.com/b"]', out)
+
+    def test_single_string_rendering_unchanged(self):
+        # la forma a stringa singola deve restare identica (retrocompat)
+        out = apply_source_meta(source_page(), self.LINK, self.URL)
+        self.assertIn('source_path: "[[raw/sources/doc]]"', out)
+        self.assertIn(f'sources: ["{self.URL}"]', out)
+
 
 if __name__ == "__main__":
     unittest.main()

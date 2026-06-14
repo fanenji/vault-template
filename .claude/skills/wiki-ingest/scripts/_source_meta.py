@@ -60,11 +60,30 @@ def extract_source_url(source_file: Path) -> str | None:
     return sm.group(1) if sm else None
 
 
-def apply_source_meta(content: str, wikilink: str, url: str | None) -> str:
+def _render_source_path(wikilink: str | list[str]) -> str:
+    """`source_path` come wikilink quotato singolo, o lista inline di wikilink
+    quotati quando la pagina deriva da più documenti raw."""
+    if isinstance(wikilink, (list, tuple)):
+        items = ", ".join(f'"{w}"' for w in wikilink)
+        return f"source_path: [{items}]"
+    return f'source_path: "{wikilink}"'
+
+
+def _render_sources(url: str | list[str]) -> str:
+    """`sources` come lista inline di URL quotati (uno o più)."""
+    urls = [url] if isinstance(url, str) else list(url)
+    items = ", ".join(f'"{u}"' for u in urls)
+    return f"sources: [{items}]"
+
+
+def apply_source_meta(content: str, wikilink: str | list[str],
+                      url: str | list[str] | None) -> str:
     """
     Riscrive nel frontmatter di una pagina wiki/sources/:
-      - `source_path` → wikilink quotato (sostituito o aggiunto)
-      - `sources` → `["<url>"]` se url è presente (altrimenti invariato)
+      - `source_path` → wikilink quotato, o lista inline di wikilink se la
+        pagina deriva da più documenti raw (sostituito o aggiunto)
+      - `sources` → `["<url>", …]` se url è presente — uno o più (altrimenti
+        invariato)
     Gli altri campi sono preservati riga-per-riga. Senza frontmatter,
     il contenuto torna invariato (la pagina è già segnalata dal lint).
     """
@@ -72,8 +91,8 @@ def apply_source_meta(content: str, wikilink: str, url: str | None) -> str:
     if payload is None:
         return content
 
-    source_path_line = f'source_path: "{wikilink}"'
-    sources_line = f'sources: ["{url}"]' if url else None
+    source_path_line = _render_source_path(wikilink)
+    sources_line = _render_sources(url) if url else None
 
     out_lines: list[str] = []
     seen_source_path = False
