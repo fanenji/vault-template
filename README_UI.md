@@ -9,7 +9,8 @@ Riepilogo dell'interfaccia utente del sistema **llm-wiki**: il plugin Obsidian
 ## 1. Cos'è
 
 Il plugin porta dentro Obsidian le **Agent Skills** della vault (`wiki-query`,
-`wiki-ingest`, e in roadmap `deep-research`/`wiki-lint`). Non reimplementa la
+`wiki-ingest`, `deep-research`, `wiki-lint`; `graph-analyze` è disponibile come
+run schedulato in background). Non reimplementa la
 logica delle skill: **pilota l'agente `pi` in modalità headless**
 (`pi -p --mode json --skill <path> "<prompt>"`) e mostra l'output in streaming.
 
@@ -83,8 +84,22 @@ Conseguenze architetturali:
 - `Mostra il thinking` (default off).
 - `Mostra i comandi eseguiti` (default off).
 - **Schedulazione lint**: toggle `Lint automatico` + `Intervallo (minuti)`
-  (default 1440, minimo 5): esegue periodicamente `wiki-lint` in background
-  (senza `--fix`) e salva `wiki/lint-report.md`, con notifica a fine run.
+  (default 1440, minimo 5): esegue periodicamente il lint **deterministico**
+  (script `lint.py`, senza LLM) e salva `_notes/lint/lint-report.md`, con notifica
+  a fine run. Il **check semantico via pi** (LLM) parte solo se compaiono
+  **warning nuovi** rispetto al run precedente.
+- **Schedulazione graph-analyze**: toggle `Analisi grafo automatica` +
+  `Intervallo (minuti)` (default 10080 = settimanale, minimo 5): esegue
+  periodicamente `graph-analyze.py --deep` (script **deterministico, nessun LLM →
+  costo token zero**) e salva `_notes/graph-analysis-<data>.md` con community
+  tematiche (Louvain), centralità/pagine-ponte (PageRank + betweenness),
+  componenti connesse e link suggeriti; notifica col path a fine run. A fase
+  unica, a differenza del lint.
+- **Meccanismo di schedulazione** (comune a lint e graph-analyze): non è un cron
+  ma un **check al minuto** sul timestamp persistito dell'ultimo run, così un run
+  scaduto parte **anche dopo un riavvio** di Obsidian (lint a +30s, graph a +45s
+  dall'avvio). I due run condividono il **mutex** delle skill: non girano mai in
+  parallelo né con i run manuali dai pannelli. Entrambi sono **off di default**.
 
 ---
 
