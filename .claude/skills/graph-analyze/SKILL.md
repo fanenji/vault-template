@@ -66,6 +66,7 @@ Costo: a ~200 nodi è istantaneo. Le complessità (coppie O(N²), Brandes O(N·E
 - Dopo `wiki-ingest` su molti file: usa `graph-analyze` per misurare l'impatto sul grafo
 - Per fix puntuali sui broken link: passa al follow-up con `wiki-lint --check structural`
 - Il report `_notes/graph-analysis-*.md` finisce nella personal area, non è parte della wiki — non viene letto da `wiki-query`/`qmd embed`
+- **Schedulazione**: il plugin `llm-wiki-control` può eseguire `graph-analyze --deep` periodicamente (Settings → "Schedulazione graph-analyze", default settimanale, stesso meccanismo del lint schedulato). È deterministico/senza LLM, quindi gira senza costo token.
 
 ## Note
 

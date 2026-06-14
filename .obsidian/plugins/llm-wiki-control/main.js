@@ -46,7 +46,10 @@ var DEFAULT_SETTINGS = {
   showToolCalls: false,
   lintScheduleEnabled: false,
   lintIntervalMinutes: 1440,
-  lintLastRunAt: 0
+  lintLastRunAt: 0,
+  graphScheduleEnabled: false,
+  graphIntervalMinutes: 10080,
+  graphLastRunAt: 0
 };
 var _LlmWikiSettingTab = class _LlmWikiSettingTab extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
@@ -194,6 +197,28 @@ var _LlmWikiSettingTab = class _LlmWikiSettingTab extends import_obsidian.Plugin
           this.plugin.settings.lintIntervalMinutes = n;
           await this.plugin.saveSettings();
           this.plugin.setupLintSchedule();
+        }
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Schedulazione graph-analyze").setHeading();
+    new import_obsidian.Setting(containerEl).setName("Analisi grafo automatica").setDesc(
+      "Esegue periodicamente graph-analyze --deep (script, senza LLM) e salva il report in _notes/graph-analysis-<data>.md: community tematiche, centralit\xE0/pagine-ponte, componenti connesse e link suggeriti."
+    ).addToggle(
+      (t) => t.setValue(this.plugin.settings.graphScheduleEnabled).onChange(async (v) => {
+        this.plugin.settings.graphScheduleEnabled = v;
+        await this.plugin.saveSettings();
+        this.plugin.setupGraphSchedule();
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Intervallo (minuti)").setDesc(
+      "Minimo 5. Default 10080 (settimanale). Il run parte anche all'avvio di Obsidian se l'ultimo \xE8 pi\xF9 vecchio dell'intervallo."
+    ).addText(
+      (t) => t.setValue(String(this.plugin.settings.graphIntervalMinutes)).onChange(async (v) => {
+        const n = parseInt(v, 10);
+        if (!Number.isNaN(n) && n > 0) {
+          this.plugin.settings.graphIntervalMinutes = n;
+          await this.plugin.saveSettings();
+          this.plugin.setupGraphSchedule();
         }
       })
     );
@@ -489,6 +514,62 @@ var PiRunner = class {
           }
         }
         resolve(null);
+      });
+    });
+  }
+  // Esegue graph-analyze --deep (script Python, nessun LLM): scrive il report
+  // in _notes/graph-analysis-<data>.md e ritorna il path di output parsato dallo
+  // stdout (riga "Output: …"), o null. Condivide il mutex delle skill (scrive in
+  // _notes/). Exit code 0 = ok; ≠0 o spawn failure → throw.
+  runDeepGraphAnalyze(timeoutMs = 10 * 6e4) {
+    if (this.skillRunning) {
+      return Promise.reject(new Error("Un'altra operazione \xE8 gi\xE0 in corso"));
+    }
+    const script = path.join(
+      this.vaultRoot,
+      ".claude",
+      "skills",
+      "graph-analyze",
+      "scripts",
+      "graph-analyze.py"
+    );
+    const args = [script, "--deep"];
+    return new Promise((resolve, reject) => {
+      let child;
+      try {
+        child = (0, import_child_process.spawn)("python3", args, {
+          cwd: this.vaultRoot,
+          env: buildEnv(),
+          detached: process.platform !== "win32"
+        });
+      } catch (err2) {
+        reject(err2);
+        return;
+      }
+      this.skillRunning = true;
+      this.children.add(child);
+      child.stdin.end();
+      const timer = setTimeout(() => killTree(child), timeoutMs);
+      let out = "";
+      let err = "";
+      child.stdout.on("data", (d) => out += d.toString());
+      child.stderr.on("data", (d) => err += d.toString());
+      child.on("error", (e) => {
+        clearTimeout(timer);
+        this.children.delete(child);
+        this.skillRunning = false;
+        reject(e);
+      });
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        this.children.delete(child);
+        this.skillRunning = false;
+        if (code !== 0) {
+          reject(new Error(err.trim() || `graph-analyze.py exit ${code}`));
+          return;
+        }
+        const line = out.split("\n").map((l) => l.trim()).find((l) => l.startsWith("Output:"));
+        resolve(line ? line.slice("Output:".length).trim() : null);
       });
     });
   }
@@ -1374,6 +1455,8 @@ var LlmWikiControlPlugin = class extends import_obsidian7.Plugin {
     super(...arguments);
     this.lintIntervalId = null;
     this.scheduledLintRunning = false;
+    this.graphIntervalId = null;
+    this.scheduledGraphRunning = false;
   }
   async onload() {
     await this.loadSettings();
@@ -1381,6 +1464,7 @@ var LlmWikiControlPlugin = class extends import_obsidian7.Plugin {
     this.runner = new PiRunner(vaultRoot, this.settings);
     this.sessionStore = new SessionStore(vaultRoot);
     this.setupLintSchedule();
+    this.setupGraphSchedule();
     this.registerView(
       VIEW_TYPE_LLM_WIKI,
       (leaf) => new ControlView(leaf, this)
@@ -1528,6 +1612,56 @@ var LlmWikiControlPlugin = class extends import_obsidian7.Plugin {
       }
     } finally {
       this.scheduledLintRunning = false;
+    }
+  }
+  // (Ri)configura la schedulazione di graph-analyze --deep. Stesso meccanismo
+  // del lint (check al minuto su `graphLastRunAt` persistito): resiste ai
+  // riavvii di Obsidian e a intervalli lunghi. Default settimanale.
+  setupGraphSchedule() {
+    if (this.graphIntervalId !== null) {
+      window.clearInterval(this.graphIntervalId);
+      this.graphIntervalId = null;
+    }
+    if (!this.settings.graphScheduleEnabled)
+      return;
+    this.graphIntervalId = window.setInterval(
+      () => void this.maybeRunScheduledGraph(),
+      6e4
+    );
+    this.registerInterval(this.graphIntervalId);
+    const startupTimer = window.setTimeout(
+      () => void this.maybeRunScheduledGraph(),
+      45e3
+    );
+    this.register(() => window.clearTimeout(startupTimer));
+  }
+  async maybeRunScheduledGraph() {
+    if (!this.settings.graphScheduleEnabled || !this.runner)
+      return;
+    if (this.scheduledGraphRunning || this.runner.isBusy())
+      return;
+    const minutes = Math.max(5, this.settings.graphIntervalMinutes || 10080);
+    const elapsed = Date.now() - (this.settings.graphLastRunAt || 0);
+    if (elapsed < minutes * 6e4)
+      return;
+    await this.runScheduledGraph();
+  }
+  // graph-analyze --deep è puramente deterministico (nessun LLM): un'unica fase.
+  async runScheduledGraph() {
+    if (this.scheduledGraphRunning || !this.runner)
+      return;
+    this.scheduledGraphRunning = true;
+    this.settings.graphLastRunAt = Date.now();
+    await this.saveSettings();
+    try {
+      const outPath = await this.runner.runDeepGraphAnalyze();
+      new import_obsidian7.Notice(
+        outPath ? `LLM Wiki: analisi grafo aggiornata \u2014 ${outPath}` : "LLM Wiki: analisi grafo completata (_notes/graph-analysis-<data>.md)."
+      );
+    } catch (e) {
+      new import_obsidian7.Notice(`LLM Wiki: analisi grafo schedulata fallita \u2014 ${String(e)}`);
+    } finally {
+      this.scheduledGraphRunning = false;
     }
   }
 };

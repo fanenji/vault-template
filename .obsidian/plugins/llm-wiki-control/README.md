@@ -24,7 +24,11 @@ Plugin **desktop-only** (usa `child_process` per lanciare `pi`).
   "mostra thinking" e "mostra i comandi eseguiti", **schedulazione lint**
   (lint automatico periodico: script deterministico senza LLM, con report e diff;
   il check semantico via pi parte solo se compaiono warning nuovi. Il run
-  scaduto parte anche all'avvio di Obsidian).
+  scaduto parte anche all'avvio di Obsidian), **schedulazione graph-analyze**
+  (analisi del grafo periodica via `graph-analyze.py --deep`: script deterministico
+  senza LLM, report in `_notes/graph-analysis-<data>.md` con community tematiche,
+  centralità/pagine-ponte, componenti e link suggeriti; default settimanale, stesso
+  meccanismo del lint — il run scaduto parte anche all'avvio di Obsidian).
 
 ## Build
 

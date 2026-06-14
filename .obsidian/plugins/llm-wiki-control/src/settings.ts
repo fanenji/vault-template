@@ -14,6 +14,11 @@ export interface LlmWikiSettings {
   // Epoch ms dell'ultimo run schedulato: persistito così un run scaduto
   // parte anche dopo un riavvio di Obsidian.
   lintLastRunAt: number;
+  // Schedulazione graph-analyze --deep (vedi main.ts setupGraphSchedule).
+  // Stesso meccanismo del lint, ma deterministico puro (nessuna escalation LLM).
+  graphScheduleEnabled: boolean;
+  graphIntervalMinutes: number;
+  graphLastRunAt: number;
 }
 
 export const DEFAULT_SETTINGS: LlmWikiSettings = {
@@ -26,6 +31,9 @@ export const DEFAULT_SETTINGS: LlmWikiSettings = {
   lintScheduleEnabled: false,
   lintIntervalMinutes: 1440,
   lintLastRunAt: 0,
+  graphScheduleEnabled: false,
+  graphIntervalMinutes: 10080,
+  graphLastRunAt: 0,
 };
 
 export class LlmWikiSettingTab extends PluginSettingTab {
@@ -243,6 +251,43 @@ export class LlmWikiSettingTab extends PluginSettingTab {
               this.plugin.settings.lintIntervalMinutes = n;
               await this.plugin.saveSettings();
               this.plugin.setupLintSchedule();
+            }
+          })
+      );
+
+    // ── Schedulazione graph-analyze ──────────────────────────────────────────
+    new Setting(containerEl).setName("Schedulazione graph-analyze").setHeading();
+
+    new Setting(containerEl)
+      .setName("Analisi grafo automatica")
+      .setDesc(
+        "Esegue periodicamente graph-analyze --deep (script, senza LLM) e salva " +
+          "il report in _notes/graph-analysis-<data>.md: community tematiche, " +
+          "centralità/pagine-ponte, componenti connesse e link suggeriti."
+      )
+      .addToggle((t) =>
+        t.setValue(this.plugin.settings.graphScheduleEnabled).onChange(async (v) => {
+          this.plugin.settings.graphScheduleEnabled = v;
+          await this.plugin.saveSettings();
+          this.plugin.setupGraphSchedule();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Intervallo (minuti)")
+      .setDesc(
+        "Minimo 5. Default 10080 (settimanale). Il run parte anche all'avvio di " +
+          "Obsidian se l'ultimo è più vecchio dell'intervallo."
+      )
+      .addText((t) =>
+        t
+          .setValue(String(this.plugin.settings.graphIntervalMinutes))
+          .onChange(async (v) => {
+            const n = parseInt(v, 10);
+            if (!Number.isNaN(n) && n > 0) {
+              this.plugin.settings.graphIntervalMinutes = n;
+              await this.plugin.saveSettings();
+              this.plugin.setupGraphSchedule();
             }
           })
       );

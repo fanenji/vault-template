@@ -14,6 +14,8 @@ export default class LlmWikiControlPlugin extends Plugin {
   sessionStore!: SessionStore;
   private lintIntervalId: number | null = null;
   private scheduledLintRunning = false;
+  private graphIntervalId: number | null = null;
+  private scheduledGraphRunning = false;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -23,6 +25,7 @@ export default class LlmWikiControlPlugin extends Plugin {
     this.sessionStore = new SessionStore(vaultRoot);
 
     this.setupLintSchedule();
+    this.setupGraphSchedule();
 
     this.registerView(
       VIEW_TYPE_LLM_WIKI,
@@ -196,6 +199,59 @@ export default class LlmWikiControlPlugin extends Plugin {
       }
     } finally {
       this.scheduledLintRunning = false;
+    }
+  }
+
+  // (Ri)configura la schedulazione di graph-analyze --deep. Stesso meccanismo
+  // del lint (check al minuto su `graphLastRunAt` persistito): resiste ai
+  // riavvii di Obsidian e a intervalli lunghi. Default settimanale.
+  setupGraphSchedule(): void {
+    if (this.graphIntervalId !== null) {
+      window.clearInterval(this.graphIntervalId);
+      this.graphIntervalId = null;
+    }
+    if (!this.settings.graphScheduleEnabled) return;
+    this.graphIntervalId = window.setInterval(
+      () => void this.maybeRunScheduledGraph(),
+      60_000
+    );
+    this.registerInterval(this.graphIntervalId);
+    // Check all'avvio (45s, dopo il check del lint per non contendere il mutex).
+    const startupTimer = window.setTimeout(
+      () => void this.maybeRunScheduledGraph(),
+      45_000
+    );
+    this.register(() => window.clearTimeout(startupTimer));
+  }
+
+  private async maybeRunScheduledGraph(): Promise<void> {
+    if (!this.settings.graphScheduleEnabled || !this.runner) return;
+    // Cede a qualsiasi altra skill in corso (incluso il lint schedulato): il
+    // check al minuto riproverà quando il mutex si libera.
+    if (this.scheduledGraphRunning || this.runner.isBusy()) return;
+    const minutes = Math.max(5, this.settings.graphIntervalMinutes || 10080);
+    const elapsed = Date.now() - (this.settings.graphLastRunAt || 0);
+    if (elapsed < minutes * 60_000) return;
+    await this.runScheduledGraph();
+  }
+
+  // graph-analyze --deep è puramente deterministico (nessun LLM): un'unica fase.
+  private async runScheduledGraph(): Promise<void> {
+    if (this.scheduledGraphRunning || !this.runner) return;
+    this.scheduledGraphRunning = true;
+    this.settings.graphLastRunAt = Date.now();
+    await this.saveSettings();
+    try {
+      const outPath = await this.runner.runDeepGraphAnalyze();
+      new Notice(
+        outPath
+          ? `LLM Wiki: analisi grafo aggiornata — ${outPath}`
+          : "LLM Wiki: analisi grafo completata (_notes/graph-analysis-<data>.md)."
+      );
+    } catch (e) {
+      new Notice(`LLM Wiki: analisi grafo schedulata fallita — ${String(e)}`);
+    } finally {
+      this.scheduledGraphRunning = false;
     }
   }
 }

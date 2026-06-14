@@ -263,6 +263,61 @@ export class PiRunner {
     });
   }
 
+  // Esegue graph-analyze --deep (script Python, nessun LLM): scrive il report
+  // in _notes/graph-analysis-<data>.md e ritorna il path di output parsato dallo
+  // stdout (riga "Output: …"), o null. Condivide il mutex delle skill (scrive in
+  // _notes/). Exit code 0 = ok; ≠0 o spawn failure → throw.
+  runDeepGraphAnalyze(timeoutMs = 10 * 60_000): Promise<string | null> {
+    if (this.skillRunning) {
+      return Promise.reject(new Error("Un'altra operazione è già in corso"));
+    }
+    const script = path.join(
+      this.vaultRoot, ".claude", "skills", "graph-analyze", "scripts", "graph-analyze.py"
+    );
+    const args = [script, "--deep"];
+
+    return new Promise((resolve, reject) => {
+      let child: ChildProcessWithoutNullStreams;
+      try {
+        child = spawn("python3", args, {
+          cwd: this.vaultRoot,
+          env: buildEnv(),
+          detached: process.platform !== "win32",
+        });
+      } catch (err) {
+        reject(err);
+        return;
+      }
+      this.skillRunning = true;
+      this.children.add(child);
+      child.stdin.end();
+
+      const timer = setTimeout(() => killTree(child), timeoutMs);
+
+      let out = "";
+      let err = "";
+      child.stdout.on("data", (d: Buffer) => (out += d.toString()));
+      child.stderr.on("data", (d: Buffer) => (err += d.toString()));
+      child.on("error", (e) => {
+        clearTimeout(timer);
+        this.children.delete(child);
+        this.skillRunning = false;
+        reject(e);
+      });
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        this.children.delete(child);
+        this.skillRunning = false;
+        if (code !== 0) {
+          reject(new Error(err.trim() || `graph-analyze.py exit ${code}`));
+          return;
+        }
+        const line = out.split("\n").map((l) => l.trim()).find((l) => l.startsWith("Output:"));
+        resolve(line ? line.slice("Output:".length).trim() : null);
+      });
+    });
+  }
+
   // Esegue `pi --list-models` una tantum e ritorna le righe non vuote.
   listModels(): Promise<string[]> {
     const piPath = this.settings.piPath || "pi";
