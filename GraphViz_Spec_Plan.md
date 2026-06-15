@@ -231,12 +231,12 @@ cluster o della struttura dei ponti — **non** esplorazione filtrata interattiv
 
 ## 8. Piano di lavoro
 
-| Fase | Deliverable | File toccati | Test/verifica |
-|---|---|---|---|
-| **0 — Contratto dati** | `graph.json` emesso da graph-analyze | `graph-analyze.py` (flag `--viz`/`--emit-json`), nuovo `_graph_emit.py`, lettura type/title, layout Python | schema json + determinismo (unittest) |
-| **1 — HTML (primario)** | `graph.html` self-contained con filtri/search/hover | nuovo `_graph_html.py` (template) + asset JS/CSS inline | rendering smoke-test; **verifica nel plugin HTML (utente, sul Mac)** |
-| **2 — Canvas (complementare)** | `graph.canvas` grouped-by-community | `_graph_canvas.py` (o estensione skill `json-canvas`) | validità JSON Canvas; apertura in Obsidian |
-| **3 — Integrazione & docs** | flag `--viz` unificato, schedulazione opzionale, doc | `graph-analyze.py`, `SKILL.md`, `README_UI.md`, plugin scheduler | suite completa verde |
+| Fase | Stato | Deliverable | File toccati | Test/verifica |
+|---|---|---|---|---|
+| **0 — Contratto dati** | ✅ fatto | `graph.json` emesso da graph-analyze | `graph-analyze.py` (`--viz`), `_graph_emit.py`, lettura type/title, layout Python | schema json + determinismo (unittest) ✅ |
+| **1 — HTML (primario)** | ✅ fatto | `graph.html` self-contained con filtri/search/hover | `_graph_html.py` (template + JS/CSS inline) | smoke-test + `node --check` ✅; **verifica nel plugin HTML/browser = step utente** |
+| **2 — Canvas (complementare)** | ✅ fatto | `graph.canvas` grouped-by-community | `_graph_canvas.py` | validità JSON Canvas ✅; apertura in Obsidian = step utente |
+| **3 — Integrazione & docs** | parziale | `--viz` unificato (json+html+canvas) ✅; schedulazione opzionale (da fare); doc ✅ | `graph-analyze.py`, `SKILL.md` | suite completa verde ✅ |
 
 ### Dettaglio fasi
 

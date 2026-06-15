@@ -384,12 +384,18 @@ def main() -> int:
     if args.viz:
         import json
         from _graph_emit import build_graph_json
+        from _graph_html import render_html
+        from _graph_canvas import build_canvas
         data = build_graph_json(nodes, edge_counts, enriched, vault_root=vault_root)
         viz_dir = vault_root / NOTES_DIR / "graph"
         viz_dir.mkdir(parents=True, exist_ok=True)
-        viz_path = viz_dir / "graph.json"
-        viz_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"Viz data: {viz_path}  ({data['meta']['nodes']} nodi, {data['meta']['edges']} archi)")
+        (viz_dir / "graph.json").write_text(
+            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        (viz_dir / "graph.html").write_text(render_html(data), encoding="utf-8")
+        (viz_dir / "graph.canvas").write_text(
+            json.dumps(build_canvas(data), ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"Viz: {viz_dir}/ (graph.json · graph.html · graph.canvas)  "
+              f"— {data['meta']['nodes']} nodi, {data['meta']['edges']} archi")
 
     return 0
 

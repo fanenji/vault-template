@@ -59,12 +59,18 @@ Costo: a ~200 nodi è istantaneo. Le complessità (coppie O(N²), Brandes O(N·E
 
 - `--console-only` — stampa riepilogo ma non scrive il file
 - `--deep` — abilita l'analisi avanzata (community, centralità, componenti, link suggeriti)
-- `--viz` — emette `_notes/graph/graph.json` (contratto dati per le visualizzazioni HTML/Canvas); implica il calcolo avanzato come `--deep`
+- `--viz` — emette le visualizzazioni in `_notes/graph/` (`graph.json` + `graph.html` + `graph.canvas`); implica il calcolo avanzato come `--deep`
 - `--vault PATH` — usa un vault diverso da quello auto-detected
 
-## Contratto dati per la visualizzazione (`--viz`)
+## Visualizzazione (`--viz`)
 
-Con `--viz` lo script scrive `_notes/graph/graph.json` (logica in `scripts/_graph_emit.py`, stdlib): nodi con `type` (dedotto dalla cartella `wiki/<tipo>s/`), `label` (title del frontmatter), flag `structural`, `linkCount`, `community`, `pagerank`, `betweenness` e posizione `x`/`y` (layout community-clustered deterministico); archi non orientati unici con `weight` (molteplicità wikilink); riepilogo `communities` e `insights` (bridges/suggested/isolated). È la sorgente unica per i renderer HTML interattivo e Canvas — vedi `GraphViz_Spec_Plan.md` (fasi 1–2). L'output sta in `_notes/`, fuori dall'indice QMD.
+Con `--viz` lo script scrive tre file in `_notes/graph/` (fuori dall'indice QMD):
+
+- **`graph.json`** — contratto dati (logica in `_graph_emit.py`, stdlib): nodi con `type` (dedotto dalla cartella `wiki/<tipo>s/`), `label` (title), flag `structural`, `linkCount`, `community`, `pagerank`, `betweenness`, posizione `x`/`y` (layout community-clustered deterministico); archi non orientati unici con `weight` (molteplicità wikilink); `communities` e `insights` (bridges/suggested/isolated).
+- **`graph.html`** — visualizzazione **interattiva self-contained** (`_graph_html.py`): Canvas-2D con pan/zoom, hover-highlight dei vicini, ricerca, toggle colore tipo/community e i filtri del riferimento (hide structural/isolated, max-links, per-type, reset). Tutto inline, nessuna risorsa remota. Si apre in un browser; **in Obsidian (obsidian-html-plugin) serve Unrestricted mode** per eseguire il JS.
+- **`graph.canvas`** — Obsidian Canvas nativo (`_graph_canvas.py`): nodi `text` con `[[wikilink]]` (cliccabili), raggruppati per community, colorati per tipo, dimensionati per grado. I filtri sono applicati a generazione (default: nascondi strutturali).
+
+Dettagli e piano: `GraphViz_Spec_Plan.md`.
 
 ## Interazione con altre skill
 

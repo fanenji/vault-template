@@ -31,6 +31,21 @@ TYPE_BY_FOLDER = {
 # Pagine auto-gestite / strutturali (sotto wiki/): non sono contenuto.
 STRUCTURAL = {"index", "overview", "log", "glossary", "lint-report", "meetings-index"}
 
+# Palette condivisa fra i renderer (HTML + Canvas) per coerenza visiva.
+TYPE_COLORS = {
+    "entity": "#2563eb",      # blue
+    "concept": "#16a34a",     # green
+    "source": "#d97706",      # amber
+    "query": "#9333ea",       # purple
+    "synthesis": "#dc2626",   # red
+    "unknown": "#64748b",     # slate
+    "structural": "#94a3b8",  # slate-400
+}
+COMMUNITY_COLORS = [
+    "#2563eb", "#16a34a", "#d97706", "#9333ea", "#dc2626", "#0891b2",
+    "#ca8a04", "#db2777", "#65a30d", "#7c3aed", "#0d9488", "#e11d48",
+]
+
 _FM_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 _TITLE_RE = re.compile(r'^title\s*:\s*"?(.*?)"?\s*$', re.MULTILINE)
 _TYPE_RE = re.compile(r'^type\s*:\s*"?([\w-]+)"?\s*$', re.MULTILINE)
