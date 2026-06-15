@@ -65,7 +65,7 @@ bash _system/scripts/init-vault.sh
 | `wiki-ingest` | Ingest 2-step (analisi → generazione) di documenti da `raw/sources/` con cache SHA256 e coda persistente | `/wiki-ingest`, `/inbox-ingest` |
 | `deep-research` | Ricerca web multi-query (Tavily + DuckDuckGo fallback) → sintesi → auto-ingest | `/deep-research` |
 | `transcript` | Trascrizione audio/video locale via `mlx_whisper` con summary opzionale via LLM | `/transcript` |
-| `graph-analyze` | Analisi del grafo wiki (nodi/edge/densità/orfani/hub) con report in `_notes/` | `/graph-analyze` |
+| `graph-analyze` | Analisi del grafo wiki (nodi/edge/densità/orfani/hub; con `--deep` anche community Louvain, centralità/pagine-ponte, link suggeriti) e report in `_notes/`. Con `--viz` emette le visualizzazioni in `_notes/graph/`: `graph.html` (interattivo self-contained: pan/zoom, filtri, ricerca, hover) e `graph.canvas` (Canvas Obsidian nativo). Il plugin può schedularlo. | `/graph-analyze` |
 
 Tutte le skill sono **portabili**: il loro stato risiede in `.claude/skills/<nome>/`, sono in markdown standard, e gli script Python in `scripts/` sono eseguibili indipendentemente da qualsiasi agente.
 

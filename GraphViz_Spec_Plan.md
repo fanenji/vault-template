@@ -236,7 +236,7 @@ cluster o della struttura dei ponti — **non** esplorazione filtrata interattiv
 | **0 — Contratto dati** | ✅ fatto | `graph.json` emesso da graph-analyze | `graph-analyze.py` (`--viz`), `_graph_emit.py`, lettura type/title, layout Python | schema json + determinismo (unittest) ✅ |
 | **1 — HTML (primario)** | ✅ fatto | `graph.html` self-contained con filtri/search/hover | `_graph_html.py` (template + JS/CSS inline) | smoke-test + `node --check` ✅; **verifica nel plugin HTML/browser = step utente** |
 | **2 — Canvas (complementare)** | ✅ fatto | `graph.canvas` grouped-by-community | `_graph_canvas.py` | validità JSON Canvas ✅; apertura in Obsidian = step utente |
-| **3 — Integrazione & docs** | parziale | `--viz` unificato (json+html+canvas) ✅; schedulazione opzionale (da fare); doc ✅ | `graph-analyze.py`, `SKILL.md` | suite completa verde ✅ |
+| **3 — Integrazione & docs** | ✅ fatto | `--viz` unificato (json+html+canvas) ✅; **schedulazione** via plugin (`--deep --viz`) ✅; doc ✅ | `graph-analyze.py`, plugin (`piRunner.ts`/`main.ts`, v0.6.0), `SKILL.md`, `README_UI.md`, `README.md` | suite completa verde ✅ |
 
 ### Dettaglio fasi
 

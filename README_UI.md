@@ -90,11 +90,15 @@ Conseguenze architetturali:
   **warning nuovi** rispetto al run precedente.
 - **Schedulazione graph-analyze**: toggle `Analisi grafo automatica` +
   `Intervallo (minuti)` (default 10080 = settimanale, minimo 5): esegue
-  periodicamente `graph-analyze.py --deep` (script **deterministico, nessun LLM →
-  costo token zero**) e salva `_notes/graph-analysis-<data>.md` con community
-  tematiche (Louvain), centralità/pagine-ponte (PageRank + betweenness),
-  componenti connesse e link suggeriti; notifica col path a fine run. A fase
-  unica, a differenza del lint.
+  periodicamente `graph-analyze.py --deep --viz` (script **deterministico, nessun
+  LLM → costo token zero**) e salva: il report `_notes/graph-analysis-<data>.md`
+  (community Louvain, centralità/pagine-ponte, componenti, link suggeriti) **e** le
+  **visualizzazioni** in `_notes/graph/` — `graph.json`, `graph.html` (interattivo
+  self-contained: pan/zoom, filtri, ricerca, hover) e `graph.canvas` (Canvas
+  Obsidian nativo, nodi `[[wikilink]]` raggruppati per community). Notifica a fine
+  run. A fase unica, a differenza del lint. Per aprire `graph.html` in Obsidian
+  serve **HTML Reader in Unrestricted mode**; altrimenti aprilo nel browser. Il
+  Canvas si apre nativamente.
 - **Meccanismo di schedulazione** (comune a lint e graph-analyze): non è un cron
   ma un **check al minuto** sul timestamp persistito dell'ultimo run, così un run
   scaduto parte **anche dopo un riavvio** di Obsidian (lint a +30s, graph a +45s

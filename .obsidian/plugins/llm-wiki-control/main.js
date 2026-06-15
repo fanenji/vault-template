@@ -517,10 +517,11 @@ var PiRunner = class {
       });
     });
   }
-  // Esegue graph-analyze --deep (script Python, nessun LLM): scrive il report
-  // in _notes/graph-analysis-<data>.md e ritorna il path di output parsato dallo
-  // stdout (riga "Output: …"), o null. Condivide il mutex delle skill (scrive in
-  // _notes/). Exit code 0 = ok; ≠0 o spawn failure → throw.
+  // Esegue graph-analyze --deep --viz (script Python, nessun LLM): scrive il
+  // report in _notes/graph-analysis-<data>.md E le visualizzazioni in
+  // _notes/graph/ (graph.json·html·canvas), e ritorna il path del report parsato
+  // dallo stdout (riga "Output: …"), o null. Condivide il mutex delle skill
+  // (scrive in _notes/). Exit code 0 = ok; ≠0 o spawn failure → throw.
   runDeepGraphAnalyze(timeoutMs = 10 * 6e4) {
     if (this.skillRunning) {
       return Promise.reject(new Error("Un'altra operazione \xE8 gi\xE0 in corso"));
@@ -533,7 +534,7 @@ var PiRunner = class {
       "scripts",
       "graph-analyze.py"
     );
-    const args = [script, "--deep"];
+    const args = [script, "--deep", "--viz"];
     return new Promise((resolve, reject) => {
       let child;
       try {
@@ -1646,7 +1647,8 @@ var LlmWikiControlPlugin = class extends import_obsidian7.Plugin {
       return;
     await this.runScheduledGraph();
   }
-  // graph-analyze --deep è puramente deterministico (nessun LLM): un'unica fase.
+  // graph-analyze --deep --viz è puramente deterministico (nessun LLM): un'unica
+  // fase. Scrive il report e le visualizzazioni (_notes/graph/graph.{json,html,canvas}).
   async runScheduledGraph() {
     if (this.scheduledGraphRunning || !this.runner)
       return;
@@ -1654,9 +1656,9 @@ var LlmWikiControlPlugin = class extends import_obsidian7.Plugin {
     this.settings.graphLastRunAt = Date.now();
     await this.saveSettings();
     try {
-      const outPath = await this.runner.runDeepGraphAnalyze();
+      await this.runner.runDeepGraphAnalyze();
       new import_obsidian7.Notice(
-        outPath ? `LLM Wiki: analisi grafo aggiornata \u2014 ${outPath}` : "LLM Wiki: analisi grafo completata (_notes/graph-analysis-<data>.md)."
+        "LLM Wiki: grafo aggiornato \u2014 report in _notes/graph-analysis-<data>.md, viz in _notes/graph/ (graph.html \xB7 graph.canvas)."
       );
     } catch (e) {
       new import_obsidian7.Notice(`LLM Wiki: analisi grafo schedulata fallita \u2014 ${String(e)}`);

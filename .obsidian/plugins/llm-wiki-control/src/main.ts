@@ -235,18 +235,18 @@ export default class LlmWikiControlPlugin extends Plugin {
     await this.runScheduledGraph();
   }
 
-  // graph-analyze --deep è puramente deterministico (nessun LLM): un'unica fase.
+  // graph-analyze --deep --viz è puramente deterministico (nessun LLM): un'unica
+  // fase. Scrive il report e le visualizzazioni (_notes/graph/graph.{json,html,canvas}).
   private async runScheduledGraph(): Promise<void> {
     if (this.scheduledGraphRunning || !this.runner) return;
     this.scheduledGraphRunning = true;
     this.settings.graphLastRunAt = Date.now();
     await this.saveSettings();
     try {
-      const outPath = await this.runner.runDeepGraphAnalyze();
+      await this.runner.runDeepGraphAnalyze();
       new Notice(
-        outPath
-          ? `LLM Wiki: analisi grafo aggiornata — ${outPath}`
-          : "LLM Wiki: analisi grafo completata (_notes/graph-analysis-<data>.md)."
+        "LLM Wiki: grafo aggiornato — report in _notes/graph-analysis-<data>.md, "
+          + "viz in _notes/graph/ (graph.html · graph.canvas)."
       );
     } catch (e) {
       new Notice(`LLM Wiki: analisi grafo schedulata fallita — ${String(e)}`);

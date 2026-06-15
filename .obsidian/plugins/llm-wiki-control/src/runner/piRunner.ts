@@ -263,10 +263,11 @@ export class PiRunner {
     });
   }
 
-  // Esegue graph-analyze --deep (script Python, nessun LLM): scrive il report
-  // in _notes/graph-analysis-<data>.md e ritorna il path di output parsato dallo
-  // stdout (riga "Output: …"), o null. Condivide il mutex delle skill (scrive in
-  // _notes/). Exit code 0 = ok; ≠0 o spawn failure → throw.
+  // Esegue graph-analyze --deep --viz (script Python, nessun LLM): scrive il
+  // report in _notes/graph-analysis-<data>.md E le visualizzazioni in
+  // _notes/graph/ (graph.json·html·canvas), e ritorna il path del report parsato
+  // dallo stdout (riga "Output: …"), o null. Condivide il mutex delle skill
+  // (scrive in _notes/). Exit code 0 = ok; ≠0 o spawn failure → throw.
   runDeepGraphAnalyze(timeoutMs = 10 * 60_000): Promise<string | null> {
     if (this.skillRunning) {
       return Promise.reject(new Error("Un'altra operazione è già in corso"));
@@ -274,7 +275,7 @@ export class PiRunner {
     const script = path.join(
       this.vaultRoot, ".claude", "skills", "graph-analyze", "scripts", "graph-analyze.py"
     );
-    const args = [script, "--deep"];
+    const args = [script, "--deep", "--viz"];
 
     return new Promise((resolve, reject) => {
       let child: ChildProcessWithoutNullStreams;
