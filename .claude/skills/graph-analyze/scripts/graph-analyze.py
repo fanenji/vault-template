@@ -350,6 +350,9 @@ def main() -> int:
     ap.add_argument("--deep", action="store_true",
                     help="Analisi avanzata: community (Louvain), centralità (PageRank/betweenness), "
                          "componenti connesse, link suggeriti")
+    ap.add_argument("--viz", action="store_true",
+                    help="Emette _notes/graph/graph.json (contratto dati per HTML/Canvas). "
+                         "Implica il calcolo avanzato come --deep.")
     args = ap.parse_args()
 
     vault_root = args.vault.resolve() if args.vault else find_vault_root(Path.cwd())
@@ -362,9 +365,12 @@ def main() -> int:
     out_raw, edge_counts = extract_edges(nodes)
     metrics = compute_metrics(nodes, edge_counts, out_raw)
 
+    enriched = None
+    if args.deep or args.viz:
+        enriched = gm.enrich(nodes, edge_counts, exclude_auto=EXCLUDE_ORPHAN)
     if args.deep:
         metrics["deep"] = True
-        metrics.update(gm.enrich(nodes, edge_counts, exclude_auto=EXCLUDE_ORPHAN))
+        metrics.update(enriched)
 
     today = date.today().isoformat()
     output_path = vault_root / NOTES_DIR / f"graph-analysis-{today}.md"
@@ -374,6 +380,16 @@ def main() -> int:
     if not args.console_only:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(build_report(metrics, today), encoding="utf-8")
+
+    if args.viz:
+        import json
+        from _graph_emit import build_graph_json
+        data = build_graph_json(nodes, edge_counts, enriched, vault_root=vault_root)
+        viz_dir = vault_root / NOTES_DIR / "graph"
+        viz_dir.mkdir(parents=True, exist_ok=True)
+        viz_path = viz_dir / "graph.json"
+        viz_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"Viz data: {viz_path}  ({data['meta']['nodes']} nodi, {data['meta']['edges']} archi)")
 
     return 0
 
